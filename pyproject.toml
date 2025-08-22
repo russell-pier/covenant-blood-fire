@@ -1,7 +1,7 @@
 [project]
-name = "empires"
+name = "covenant-blood-fire"
 version = "0.1.0"
-description = "Terminal Age of Empires"
+description = "Covenant: Blood & Fire - Terminal Strategy Game"
 requires-python = ">=3.13"
 dependencies = ["tcod>=19.4.0"]
 
