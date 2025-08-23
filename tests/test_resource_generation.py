@@ -8,14 +8,14 @@ generation system across all three world layers.
 import pytest
 from typing import Dict, Tuple
 
-from src.empires.world.layered import WorldLayer, LayeredTerrainData
-from src.empires.world.resource_generator import ClusteredResourceGenerator
-from src.empires.world.resource_types import ResourceType, ResourceNode, get_resource_layer
-from src.empires.world.resource_utils import (
+from src.covenant.world.layered import WorldLayer, LayeredTerrainData
+from src.covenant.world.resource_generator import ClusteredResourceGenerator
+from src.covenant.world.resource_types import ResourceType, ResourceNode, get_resource_layer
+from src.covenant.world.resource_utils import (
     get_resource_at_position, has_resource_at_position, get_all_resources_in_chunk,
     count_resources_by_type, get_resource_summary, can_access_layer
 )
-from src.empires.world.layered_generator import LayeredWorldGenerator
+from src.covenant.world.layered_generator import LayeredWorldGenerator
 
 
 class TestResourceGenerator:

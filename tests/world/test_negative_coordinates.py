@@ -8,10 +8,10 @@ This module tests that negative coordinates work correctly with:
 - Character variations and organic features
 """
 
-from src.empires.world.chunks import ChunkManager
-from src.empires.world.generator import create_organic_world_generator
-from src.empires.world.organic import OrganicNoiseGenerator
-from src.empires.world.terrain import TerrainType
+from src.covenant.world.chunks import ChunkManager
+from src.covenant.world.generator import create_organic_world_generator
+from src.covenant.world.organic import OrganicNoiseGenerator
+from src.covenant.world.terrain import TerrainType
 from collections import Counter
 import math
 

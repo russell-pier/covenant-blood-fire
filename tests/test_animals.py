@@ -10,11 +10,11 @@ import pytest
 import time
 from unittest.mock import Mock, patch
 
-from src.empires.world.animals import (
+from src.covenant.world.animals import (
     Vector2D, Animal, Sheep, Cow, Herd, AnimalManager,
     AnimalType, AnimalState
 )
-from src.empires.world.terrain import TerrainType
+from src.covenant.world.terrain import TerrainType
 
 
 class TestVector2D:
@@ -364,7 +364,7 @@ class TestIntegration:
 
     def test_world_generator_integration(self):
         """Test integration with WorldGenerator."""
-        from src.empires.world.generator import WorldGenerator
+        from src.covenant.world.generator import WorldGenerator
 
         # Create world generator with animals enabled
         world_gen = WorldGenerator(

@@ -7,11 +7,11 @@ meets performance requirements compared to the legacy system.
 
 import time
 import pytest
-from src.empires.world.generator import (
+from src.covenant.world.generator import (
     create_environmental_world_generator, 
     create_legacy_world_generator
 )
-from src.empires.world.chunks import ChunkCoordinate
+from src.covenant.world.chunks import ChunkCoordinate
 
 
 class TestPerformanceBenchmarks:

@@ -4,7 +4,7 @@ Tests for the noise generation module.
 
 import pytest
 
-from src.empires.world.noise import (
+from src.covenant.world.noise import (
     NoiseConfig,
     NoiseGenerator,
     create_default_noise_generator,

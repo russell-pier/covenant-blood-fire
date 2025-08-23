@@ -8,11 +8,11 @@ command registration and layer switching operations.
 import pytest
 from unittest.mock import Mock, MagicMock
 
-from empires.commands.command_system import CommandRegistry
-from empires.commands.layer_commands import (
+from covenant.commands.command_system import CommandRegistry
+from covenant.commands.layer_commands import (
     LayerCommands, register_layer_commands, create_layer_command_system
 )
-from empires.world.layered import WorldLayer
+from covenant.world.layered import WorldLayer
 
 
 class TestLayerCommands:

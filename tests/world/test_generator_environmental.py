@@ -6,13 +6,13 @@ environmental layer system.
 """
 
 import pytest
-from src.empires.world.generator import (
+from src.covenant.world.generator import (
     WorldGenerator, create_default_world_generator, 
     create_legacy_world_generator, create_environmental_world_generator
 )
-from src.empires.world.terrain import TerrainType
-from src.empires.world.environmental import EnvironmentalData
-from src.empires.world.chunks import ChunkCoordinate
+from src.covenant.world.terrain import TerrainType
+from src.covenant.world.environmental import EnvironmentalData
+from src.covenant.world.chunks import ChunkCoordinate
 
 
 class TestWorldGeneratorEnvironmental:

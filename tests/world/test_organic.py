@@ -6,12 +6,12 @@ and visual enhancements.
 """
 
 import pytest
-from src.empires.world.organic import (
+from src.covenant.world.organic import (
     OrganicWorldGenerator, OrganicTerrainData, OrganicNoiseGenerator,
     TERRAIN_CHARACTER_VARIATIONS, create_organic_world_generator
 )
-from src.empires.world.generator import create_organic_world_generator as create_integrated_organic_generator
-from src.empires.world.terrain import TerrainType
+from src.covenant.world.generator import create_organic_world_generator as create_integrated_organic_generator
+from src.covenant.world.terrain import TerrainType
 
 
 class TestOrganicNoiseGenerator:

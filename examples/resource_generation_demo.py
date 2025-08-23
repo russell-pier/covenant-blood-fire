@@ -12,10 +12,10 @@ import os
 # Add the src directory to the path so we can import our modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from empires.world.layered_generator import LayeredWorldGenerator
-from empires.world.layered import WorldLayer
-from empires.world.resource_utils import get_resource_summary, get_all_resources_in_chunk
-from empires.world.resource_types import ResourceType
+from covenant.world.layered_generator import LayeredWorldGenerator
+from covenant.world.layered import WorldLayer
+from covenant.world.resource_utils import get_resource_summary, get_all_resources_in_chunk
+from covenant.world.resource_types import ResourceType
 
 
 def print_chunk_visualization(chunk_data, layer, chunk_size=8):

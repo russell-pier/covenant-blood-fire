@@ -6,14 +6,14 @@ terrain mapping functionality.
 """
 
 import pytest
-from src.empires.world.environmental import (
+from src.covenant.world.environmental import (
     EnvironmentalData, EnvironmentalGenerator, 
     create_default_environmental_generator
 )
-from src.empires.world.environmental_config import (
+from src.covenant.world.environmental_config import (
     EnvironmentalConfig, create_default_environmental_config
 )
-from src.empires.world.terrain import (
+from src.covenant.world.terrain import (
     EnvironmentalTerrainMapper, TerrainType, create_environmental_terrain_mapper
 )
 

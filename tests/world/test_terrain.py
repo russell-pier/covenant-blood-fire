@@ -4,7 +4,7 @@ Tests for the terrain module.
 
 import pytest
 
-from src.empires.world.terrain import (
+from src.covenant.world.terrain import (
     TerrainType,
     TerrainProperties,
     TerrainMapper,

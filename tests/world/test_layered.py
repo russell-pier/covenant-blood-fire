@@ -8,12 +8,12 @@ structures for the underground, surface, and mountain layers.
 import pytest
 from unittest.mock import Mock
 
-from empires.world.layered import (
+from covenant.world.layered import (
     WorldLayer, LayeredTerrainData, TerrainData, TerrainType,
     create_terrain_data, get_terrain_config, TERRAIN_CONFIGS
 )
-from empires.world.layered_generator import LayeredWorldGenerator, create_layered_world_generator
-from empires.world.camera_3d import CameraSystem, create_default_camera_3d
+from covenant.world.layered_generator import LayeredWorldGenerator, create_layered_world_generator
+from covenant.world.camera_3d import CameraSystem, create_default_camera_3d
 
 
 class TestWorldLayer:

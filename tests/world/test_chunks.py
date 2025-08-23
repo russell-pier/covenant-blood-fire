@@ -4,12 +4,12 @@ Tests for the chunk management system.
 
 import pytest
 
-from src.empires.world.chunks import (
+from src.covenant.world.chunks import (
     ChunkCoordinate,
     Chunk,
     ChunkManager
 )
-from src.empires.world.terrain import TerrainType
+from src.covenant.world.terrain import TerrainType
 
 
 class TestChunkCoordinate:

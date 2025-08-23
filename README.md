@@ -1,5 +1,20 @@
 # Covenant: Blood & Fire
 
+```ascii
+   ___                                 _               
+  / __\_____   _____ _ __   __ _ _ __ | |_ _           
+ / /  / _ \ \ / / _ \ '_ \ / _` | '_ \| __(_)          
+/ /__| (_) \ V /  __/ | | | (_| | | | | |_ _           
+\____/\___/ \_/ \___|_| |_|\__,_|_| |_|\__(_)          
+                                                       
+   ___ _                 _    ___       ___ _          
+  / __\ | ___   ___   __| |  ( _ )     / __(_)_ __ ___ 
+ /__\// |/ _ \ / _ \ / _` |  / _ \/\  / _\ | | '__/ _ \
+/ \/  \ | (_) | (_) | (_| | | (_>  < / /   | | | |  __/
+\_____/_|\___/ \___/ \__,_|  \___/\/ \/    |_|_|  \___|
+                                                       
+```
+
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-66%20passed-green.svg)](tests/)
@@ -11,18 +26,21 @@ A terminal-based strategy game built with Python and libtcod, featuring infinite
 ## ✨ Features
 
 ### 🌍 **Infinite World Generation**
+
 - **Procedural terrain** using Perlin noise algorithms
 - **Chunk-based system** for efficient memory management
 - **9 terrain types**: Deep water, shallow water, sand, grasslands, forests, hills, and mountains
 - **Seamless exploration** with no loading screens
 
 ### 🎮 **Intuitive Controls**
+
 - **Fixed crosshair cursor** at screen center
 - **Smooth world scrolling** with arrow keys or WASD
 - **Real-time performance monitoring** with FPS display
 - **Responsive 60 FPS gameplay**
 
 ### 🏗️ **Modern Architecture**
+
 - **Modular design** with clean separation of concerns
 - **Comprehensive test suite** (66 tests, 100% pass rate)
 - **Type hints** throughout for better IDE support
@@ -165,6 +183,7 @@ covenant-blood-fire/
 ## 🎯 Roadmap
 
 ### Phase 1: Core Systems ✅
+
 - [x] Infinite world generation
 - [x] Chunk-based memory management
 - [x] Camera and viewport system
@@ -172,12 +191,14 @@ covenant-blood-fire/
 - [x] Comprehensive testing
 
 ### Phase 2: Gameplay (Planned)
+
 - [ ] Unit system (villagers, military units)
 - [ ] Resource management (food, wood, stone, gold)
 - [ ] Building construction
 - [ ] Technology research tree
 
 ### Phase 3: Advanced Features (Future)
+
 - [ ] Multiplayer support
 - [ ] AI opponents
 - [ ] Save/load functionality
@@ -211,12 +232,14 @@ uv run python -m pytest tests/
 ## 📋 Requirements
 
 ### System Requirements
+
 - **Python**: 3.13 or higher
 - **Memory**: 100MB+ RAM
 - **Storage**: 50MB+ disk space
 - **Terminal**: Any modern terminal with color support
 
 ### Dependencies
+
 - **tcod**: Terminal graphics and input handling
 - **Development**: pytest, black, ruff, mypy (optional)
 
@@ -227,6 +250,7 @@ uv run python -m pytest tests/
 **Font loading warnings**: The game may show font loading warnings but will work with system defaults.
 
 **Performance issues**: If experiencing low FPS:
+
 - Ensure Python 3.13+ is being used
 - Close other resource-intensive applications
 - Check terminal performance settings

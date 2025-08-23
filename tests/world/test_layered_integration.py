@@ -8,9 +8,9 @@ world generation infrastructure, including chunk management and rendering.
 import pytest
 from unittest.mock import Mock
 
-from empires.world.generator import WorldGenerator
-from empires.world.layered import WorldLayer, LayeredTerrainData, TerrainType
-from empires.world.chunks import ChunkCoordinate
+from covenant.world.generator import WorldGenerator
+from covenant.world.layered import WorldLayer, LayeredTerrainData, TerrainType
+from covenant.world.chunks import ChunkCoordinate
 
 
 class TestWorldGeneratorLayeredIntegration:

@@ -5,9 +5,9 @@ This module tests the large-scale terrain features, terrain transitions,
 independent river systems, and logical terrain progression.
 """
 
-from src.empires.world.organic import OrganicWorldGenerator
-from src.empires.world.generator import create_organic_world_generator
-from src.empires.world.terrain import TerrainType
+from src.covenant.world.organic import OrganicWorldGenerator
+from src.covenant.world.generator import create_organic_world_generator
+from src.covenant.world.terrain import TerrainType
 from collections import Counter, defaultdict
 
 

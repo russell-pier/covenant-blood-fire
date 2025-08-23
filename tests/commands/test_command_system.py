@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 import tcod
 
-from empires.commands.command_system import (
+from covenant.commands.command_system import (
     Command, CommandRegistry, CommandPalette, create_default_command_system
 )
 

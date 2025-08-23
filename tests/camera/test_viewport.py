@@ -5,7 +5,7 @@ Tests for the camera and viewport system.
 import pytest
 import tcod
 
-from src.empires.camera.viewport import (
+from src.covenant.camera.viewport import (
     CameraConfig,
     Camera,
     Viewport,
@@ -212,7 +212,7 @@ class TestViewport:
 
     def test_render_crosshair_with_world_generator(self):
         """Test rendering the crosshair with world generator to show terrain character."""
-        from empires.world.generator import create_environmental_world_generator
+        from covenant.world.generator import create_environmental_world_generator
 
         camera = Camera()
         viewport = Viewport(camera)
