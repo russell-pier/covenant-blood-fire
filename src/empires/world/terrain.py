@@ -347,43 +347,43 @@ class EnvironmentalTerrainMapper(TerrainMapper):
         Convert environmental data to terrain type using rule-based system.
 
         Args:
-            env_data: EnvironmentalData containing elevation, moisture, and temperature
+            env_data: EnvironmentalData containing elevation (meters), moisture, and temperature (Celsius)
 
         Returns:
             TerrainType determined by environmental conditions
         """
-        elevation = env_data.elevation
-        moisture = env_data.moisture
-        temperature = env_data.temperature
+        elevation = env_data.elevation  # In meters
+        moisture = env_data.moisture    # 0.0 to 1.0
+        temperature = env_data.temperature  # In Celsius
 
         # Terrain determination logic (in priority order)
-        if elevation < 0.2:
+        if elevation < -50:
             return TerrainType.CAVES
-        elif elevation < 0.25:
+        elif elevation < 0:
             return TerrainType.DEEP_WATER
-        elif elevation < 0.35:
+        elif elevation < 50:
             return TerrainType.SHALLOW_WATER
-        elif elevation < 0.45 and moisture > 0.75:
+        elif elevation < 100 and moisture > 0.75:
             return TerrainType.SWAMP
-        elif temperature > 0.65 and moisture < 0.35:
+        elif temperature > 25 and moisture < 0.35:
             return TerrainType.DESERT
-        elif moisture > 0.6 and 0.4 < temperature < 0.7 and 0.35 < elevation < 0.6:
+        elif moisture > 0.6 and 5 < temperature < 25 and 50 < elevation < 500:
             return TerrainType.FERTILE
-        elif moisture > 0.6 and 0.3 < temperature < 0.8:
+        elif moisture > 0.6 and 0 < temperature < 30:
             return TerrainType.FOREST
-        elif elevation > 0.7 and temperature < 0.4:
+        elif elevation > 630:   # Mountains start at ~630m (matches actual elevation ranges)
             return TerrainType.MOUNTAINS
-        elif elevation > 0.6:
+        elif elevation > 580:   # Hills start at ~580m
             return TerrainType.HILLS
         else:
             # Default terrain types based on moisture and temperature
             if moisture > 0.5:
-                if temperature > 0.6:
+                if temperature > 15:
                     return TerrainType.LIGHT_GRASS
                 else:
                     return TerrainType.DARK_GRASS
             else:
-                if temperature > 0.5:
+                if temperature > 10:
                     return TerrainType.SAND
                 else:
                     return TerrainType.GRASS

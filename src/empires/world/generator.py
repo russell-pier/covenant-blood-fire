@@ -520,7 +520,8 @@ class WorldGenerator:
                     center_x=sheep_center_x,
                     center_y=sheep_center_y,
                     herd_id=sheep_herd_id,
-                    size=4
+                    size=4,
+                    layer=WorldLayer.SURFACE
                 )
 
                 # Then spawn cows nearby
@@ -534,7 +535,8 @@ class WorldGenerator:
                         center_x=cow_center_x,
                         center_y=cow_center_y,
                         herd_id=cow_herd_id,
-                        size=4
+                        size=4,
+                        layer=WorldLayer.SURFACE
                     )
                 return  # Skip the normal spawning logic for origin chunk
             else:
@@ -551,7 +553,8 @@ class WorldGenerator:
                 center_x=center_x,
                 center_y=center_y,
                 herd_id=herd_id,
-                size=herd_size
+                size=herd_size,
+                layer=WorldLayer.SURFACE
             )
         elif is_origin_chunk:
             # Force spawn sheep in origin chunk even if terrain isn't ideal
@@ -574,7 +577,8 @@ class WorldGenerator:
                     center_x=center_x,
                     center_y=center_y,
                     herd_id=herd_id,
-                    size=6
+                    size=6,
+                    layer=WorldLayer.SURFACE
                 )
 
     def _is_suitable_for_animals(self, terrain_type: TerrainType) -> bool:
@@ -698,6 +702,21 @@ class WorldGenerator:
             return []
 
         return self.animal_manager.get_all_animal_positions()
+
+    def get_animal_positions_for_layer(self, layer: WorldLayer) -> List[Tuple[int, int, str, Tuple[int, int, int]]]:
+        """
+        Get positions and render data for animals on a specific layer.
+
+        Args:
+            layer: The layer to get animals for
+
+        Returns:
+            List of tuples (x, y, character, color) for rendering animals on the specified layer
+        """
+        if not self.animal_manager:
+            return []
+
+        return self.animal_manager.get_animal_positions_for_layer(layer)
 
     def get_animals_at_position(self, x: int, y: int):
         """

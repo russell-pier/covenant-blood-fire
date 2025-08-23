@@ -9,6 +9,7 @@ wandering, and group cohesion while avoiding obstacles and responding to environ
 import math
 import random
 import time
+import threading
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -17,6 +18,13 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .organic import OrganicTerrainData
+
+# Import layered system
+try:
+    from .layered import WorldLayer
+except ImportError:
+    # Fallback if layered system not available
+    WorldLayer = None
 
 # Import config system
 try:
@@ -88,11 +96,14 @@ class Animal(ABC):
     # Identity
     id: int
     animal_type: AnimalType
-    
+
     # Position and movement
     x: float
     y: float
     velocity: Vector2D = field(default_factory=lambda: Vector2D(0, 0))
+
+    # Layer information
+    layer: 'WorldLayer' = None  # Which layer this animal exists on
     
     # Movement parameters (to be set by subclasses)
     max_speed: float = 0.3
@@ -318,11 +329,12 @@ class Sheep(Animal):
     tight flocking behavior with quick state transitions.
     """
 
-    def __init__(self, id: int, x: float, y: float):
+    def __init__(self, id: int, x: float, y: float, layer: 'WorldLayer' = None):
         """Initialize a sheep with sheep-specific parameters."""
         super().__init__(
             id=id,
             animal_type=AnimalType.SHEEP,
+            layer=layer,
             x=x,
             y=y,
             max_speed=random.uniform(0.3, 0.4),  # Fast movement
@@ -392,11 +404,12 @@ class Cow(Animal):
     loose flocking behavior with longer state transitions.
     """
 
-    def __init__(self, id: int, x: float, y: float):
+    def __init__(self, id: int, x: float, y: float, layer: 'WorldLayer' = None):
         """Initialize a cow with cow-specific parameters."""
         super().__init__(
             id=id,
             animal_type=AnimalType.COW,
+            layer=layer,
             x=x,
             y=y,
             max_speed=random.uniform(0.1, 0.2),  # Slow movement
@@ -466,7 +479,7 @@ class Herd:
     spawning, and position tracking for groups of animals.
     """
 
-    def __init__(self, animal_type: AnimalType, center_x: float, center_y: float, herd_size: int = 8):
+    def __init__(self, animal_type: AnimalType, center_x: float, center_y: float, herd_size: int = 8, layer: 'WorldLayer' = None):
         """
         Initialize a herd of animals.
 
@@ -475,10 +488,12 @@ class Herd:
             center_x: Center X position for spawning
             center_y: Center Y position for spawning
             herd_size: Number of animals to spawn
+            layer: Which layer these animals exist on
         """
         self.animal_type = animal_type
         self.animals: List[Animal] = []
         self.last_update = time.time()
+        self.layer = layer
 
         # Create initial herd spread around center
         for i in range(herd_size):
@@ -491,9 +506,9 @@ class Herd:
 
             # Create animal based on type
             if animal_type == AnimalType.SHEEP:
-                animal = Sheep(id=i, x=animal_x, y=animal_y)
+                animal = Sheep(id=i, x=animal_x, y=animal_y, layer=layer)
             elif animal_type == AnimalType.COW:
-                animal = Cow(id=i, x=animal_x, y=animal_y)
+                animal = Cow(id=i, x=animal_x, y=animal_y, layer=layer)
             else:
                 raise ValueError(f"Unsupported animal type: {animal_type}")
 
@@ -534,9 +549,9 @@ class Herd:
         new_id = max([a.id for a in self.animals]) + 1 if self.animals else 0
 
         if self.animal_type == AnimalType.SHEEP:
-            new_animal = Sheep(id=new_id, x=x, y=y)
+            new_animal = Sheep(id=new_id, x=x, y=y, layer=self.layer)
         elif self.animal_type == AnimalType.COW:
-            new_animal = Cow(id=new_id, x=x, y=y)
+            new_animal = Cow(id=new_id, x=x, y=y, layer=self.layer)
         else:
             raise ValueError(f"Unsupported animal type: {self.animal_type}")
 
@@ -561,6 +576,7 @@ class AnimalManager:
         self.herds: Dict[str, Herd] = {}
         self.update_frequency = 0.1  # Update 10 times per second
         self.last_update = time.time()
+        self._herds_lock = threading.RLock()  # Reentrant lock for thread safety
 
         # Performance optimization settings
         self.spatial_grid_size = 8  # Size of spatial grid cells
@@ -578,7 +594,8 @@ class AnimalManager:
         center_x: float,
         center_y: float,
         herd_id: str,
-        size: int = 8
+        size: int = 8,
+        layer: 'WorldLayer' = None
     ) -> None:
         """
         Spawn a new herd at location.
@@ -589,8 +606,10 @@ class AnimalManager:
             center_y: Center Y position for spawning
             herd_id: Unique identifier for this herd
             size: Number of animals in the herd
+            layer: Which layer these animals exist on
         """
-        self.herds[herd_id] = Herd(animal_type, center_x, center_y, size)
+        with self._herds_lock:
+            self.herds[herd_id] = Herd(animal_type, center_x, center_y, size, layer)
 
     def update_animals(self, terrain_data: Dict, camera_x: int = 0, camera_y: int = 0) -> None:
         """
@@ -613,7 +632,11 @@ class AnimalManager:
             spatial_grid = self._build_spatial_grid()
 
             # Update each herd with optimizations
-            for herd in self.herds.values():
+            with self._herds_lock:
+                # Create a snapshot of herds to avoid iteration issues
+                herds_snapshot = list(self.herds.values())
+
+            for herd in herds_snapshot:
                 self._update_herd_optimized(herd, terrain_data, camera_x, camera_y, spatial_grid)
 
             self.last_update = current_time
@@ -627,7 +650,11 @@ class AnimalManager:
         """
         spatial_grid = defaultdict(list)
 
-        for herd in self.herds.values():
+        with self._herds_lock:
+            # Create a snapshot of herds to avoid iteration issues
+            herds_snapshot = list(self.herds.values())
+
+        for herd in herds_snapshot:
             for animal in herd.animals:
                 # Calculate grid coordinates
                 grid_x = int(animal.x // self.spatial_grid_size)
@@ -722,9 +749,32 @@ class AnimalManager:
             List of tuples (x, y, character, color) for rendering
         """
         all_positions = []
-        for herd in self.herds.values():
+        with self._herds_lock:
+            herds_snapshot = list(self.herds.values())
+
+        for herd in herds_snapshot:
             all_positions.extend(herd.get_animal_positions())
         return all_positions
+
+    def get_animal_positions_for_layer(self, layer: 'WorldLayer') -> List[Tuple[int, int, str, Tuple[int, int, int]]]:
+        """
+        Get render data for animals on a specific layer.
+
+        Args:
+            layer: The layer to get animals for
+
+        Returns:
+            List of tuples (x, y, character, color) for rendering animals on the specified layer
+        """
+        layer_positions = []
+        with self._herds_lock:
+            herds_snapshot = list(self.herds.values())
+
+        for herd in herds_snapshot:
+            # Only include animals from herds on the specified layer
+            if herd.layer == layer:
+                layer_positions.extend(herd.get_animal_positions())
+        return layer_positions
 
     def get_animals_at_position(self, x: int, y: int) -> List[Animal]:
         """
@@ -738,7 +788,10 @@ class AnimalManager:
             List of animals at the specified position
         """
         animals = []
-        for herd in self.herds.values():
+        with self._herds_lock:
+            herds_snapshot = list(self.herds.values())
+
+        for herd in herds_snapshot:
             for animal in herd.animals:
                 if int(animal.x) == x and int(animal.y) == y:
                     animals.append(animal)
@@ -746,16 +799,19 @@ class AnimalManager:
 
     def remove_herd(self, herd_id: str) -> None:
         """Remove a herd from the world."""
-        if herd_id in self.herds:
-            del self.herds[herd_id]
+        with self._herds_lock:
+            if herd_id in self.herds:
+                del self.herds[herd_id]
 
     def get_herd_count(self) -> int:
         """Get the total number of herds."""
-        return len(self.herds)
+        with self._herds_lock:
+            return len(self.herds)
 
     def get_total_animal_count(self) -> int:
         """Get the total number of animals across all herds."""
-        return sum(len(herd.animals) for herd in self.herds.values())
+        with self._herds_lock:
+            return sum(len(herd.animals) for herd in self.herds.values())
 
     def get_performance_stats(self) -> Dict[str, int]:
         """

@@ -8,7 +8,8 @@ and transition validation.
 
 from typing import Tuple
 
-from .layered import WorldLayer, LayeredTerrainData, TerrainData, TerrainType, create_terrain_data
+from .layered import WorldLayer, LayeredTerrainData, TerrainData, create_terrain_data
+from .terrain import TerrainType
 
 
 class CameraSystem:
@@ -86,6 +87,19 @@ class CameraSystem:
         """
         base_terrain = terrain_data.surface
 
+        # If there's a mountain cliff above, show it as an impassable cliff wall in surface layer
+        if terrain_data.mountains and terrain_data.mountains.terrain_type == TerrainType.MOUNTAIN_CLIFF:
+            # Render mountain cliff as a solid wall similar to cave walls
+            return TerrainData(
+                terrain_type=TerrainType.MOUNTAIN_CLIFF,
+                char="█",  # Solid block like cave walls
+                fg_color=(80, 60, 40),    # Dark cliff colors
+                bg_color=(40, 30, 20),    # Very dark background
+                elevation=terrain_data.mountains.elevation,
+                is_passable=False,  # Impassable from surface layer
+                is_entrance=False
+            )
+
         # If there's a mountain above, add subtle shading hint
         if terrain_data.mountains:
             # Slight mountain shadow effect (less pronounced than before)
@@ -147,6 +161,7 @@ class CameraSystem:
     def _apply_mountain_shading(self, terrain_data: LayeredTerrainData) -> TerrainData:
         """
         Render mountain layer with much lighter surface view below (elevation perspective).
+        Mountain cliffs become normal passable terrain in the mountain layer.
 
         Args:
             terrain_data: Layered terrain data
@@ -169,6 +184,19 @@ class CameraSystem:
                 bg_color=lightened_bg,
                 elevation=surface_terrain.elevation,
                 is_passable=False  # Can't walk on surface from mountain layer
+            )
+
+        # Handle mountain cliffs specially - they become normal terrain in mountain layer
+        if terrain_data.mountains.terrain_type == TerrainType.MOUNTAIN_CLIFF:
+            # Convert cliff to passable mountain slope terrain
+            return TerrainData(
+                terrain_type=TerrainType.MOUNTAIN_SLOPE,
+                char="^",  # Mountain slope character
+                fg_color=(140, 120, 100),  # Normal mountain slope colors
+                bg_color=(100, 80, 60),
+                elevation=terrain_data.mountains.elevation,
+                is_passable=True,  # Passable in mountain layer
+                is_entrance=False
             )
 
         return terrain_data.mountains

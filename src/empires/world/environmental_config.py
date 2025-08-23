@@ -20,22 +20,22 @@ except ImportError:
 class EnvironmentalConfig:
     """Configuration for environmental layer generation."""
     
-    # Elevation settings
+    # Elevation settings - much smaller frequency for gradual 1m² changes
     elevation_octaves: int = 6
-    elevation_frequency: float = 0.025
+    elevation_frequency: float = 0.0001  # Very gradual elevation changes
     elevation_persistence: float = 0.65
     elevation_lacunarity: float = 2.0
     
-    # Moisture settings
+    # Moisture settings - gradual changes for realistic weather patterns
     moisture_octaves: int = 3
-    moisture_frequency: float = 0.05
+    moisture_frequency: float = 0.001  # Gradual moisture changes
     moisture_persistence: float = 0.5
     moisture_lacunarity: float = 2.0
     moisture_water_influence_radius: float = 10.0
-    
-    # Temperature settings
+
+    # Temperature settings - gradual changes for realistic climate
     temperature_octaves: int = 2
-    temperature_frequency: float = 0.04
+    temperature_frequency: float = 0.0005  # Very gradual temperature changes
     temperature_persistence: float = 0.4
     temperature_lacunarity: float = 2.0
     temperature_latitude_influence: float = 0.3

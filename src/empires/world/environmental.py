@@ -17,18 +17,19 @@ from .noise import NoiseConfig, NoiseGenerator
 @dataclass
 class EnvironmentalData:
     """Container for environmental layer values at a specific location."""
-    
-    elevation: float    # 0.0 to 1.0 (0 = deep caves, 0.3 = sea level, 1 = highest mountains)
+
+    elevation: float    # In meters (-200 = deep caves, 0 = sea level, 3000 = highest mountains)
     moisture: float     # 0.0 to 1.0 (0 = desert dry, 1 = swamp wet)
-    temperature: float  # 0.0 to 1.0 (0 = cold, 1 = hot)
-    
+    temperature: float  # In Celsius (-20°C = arctic, 40°C = desert)
+
     def __post_init__(self):
         """Validate that all values are in the expected range."""
-        for field_name, value in [("elevation", self.elevation), 
-                                  ("moisture", self.moisture), 
-                                  ("temperature", self.temperature)]:
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(f"{field_name} must be between 0.0 and 1.0, got {value}")
+        if not -200 <= self.elevation <= 3000:
+            raise ValueError(f"elevation must be between -200 and 3000 meters, got {self.elevation}")
+        if not 0.0 <= self.moisture <= 1.0:
+            raise ValueError(f"moisture must be between 0.0 and 1.0, got {self.moisture}")
+        if not -20 <= self.temperature <= 40:
+            raise ValueError(f"temperature must be between -20 and 40°C, got {self.temperature}")
 
 
 class EnvironmentalGenerator:
@@ -120,28 +121,33 @@ class EnvironmentalGenerator:
     
     def _normalize_elevation(self, raw_elevation: float) -> float:
         """
-        Normalize raw elevation noise to 0.0-1.0 range with proper distribution.
+        Convert raw elevation noise to meters with proper distribution.
 
         Args:
             raw_elevation: Raw noise value between -1 and 1
 
         Returns:
-            Normalized elevation between 0.0 and 1.0
+            Elevation in meters between -200 and 3000
         """
         # Convert from [-1, 1] to [0, 1]
         normalized = (raw_elevation + 1.0) / 2.0
 
         # Apply a curve that creates more water and varied terrain
         # This ensures we get a good distribution of elevations including water
-        # Use a power curve that creates more low elevations (water) and high elevations (mountains)
-        if normalized < 0.5:
-            # Lower half: create more water areas
-            curved = math.pow(normalized * 2, 1.5) * 0.5
+        if normalized < 0.3:
+            # Lower 30%: underwater and caves (-200 to 0m)
+            curved = math.pow(normalized / 0.3, 1.5) * 0.3
+            elevation_meters = -200 + curved * 200
+        elif normalized < 0.6:
+            # Middle 30%: low land (0 to 800m)
+            curved = (normalized - 0.3) / 0.3
+            elevation_meters = curved * 800
         else:
-            # Upper half: create land with some high elevations
-            curved = 0.5 + math.pow((normalized - 0.5) * 2, 0.7) * 0.5
+            # Upper 40%: hills and mountains (800 to 3000m) - expanded for more mountains
+            curved = math.pow((normalized - 0.6) / 0.4, 0.7)
+            elevation_meters = 800 + curved * 2200
 
-        return max(0.0, min(1.0, curved))
+        return max(-200, min(3000, elevation_meters))
     
     def _calculate_moisture(self, raw_moisture: float, elevation: float, x: float, y: float) -> float:
         """
@@ -172,30 +178,30 @@ class EnvironmentalGenerator:
     
     def _calculate_temperature(self, raw_temperature: float, elevation: float, y: float) -> float:
         """
-        Calculate temperature considering base noise, elevation cooling, and latitude.
-        
+        Calculate temperature in Celsius considering base noise, elevation cooling, and latitude.
+
         Args:
             raw_temperature: Raw noise value between -1 and 1
-            elevation: Elevation value between 0.0 and 1.0
+            elevation: Elevation value in meters
             y: World Y coordinate (for latitude calculation)
-            
+
         Returns:
-            Temperature value between 0.0 and 1.0
+            Temperature value in Celsius between -20 and 40
         """
-        # Convert from [-1, 1] to [0, 1]
-        base_temperature = (raw_temperature + 1.0) / 2.0
-        
+        # Convert from [-1, 1] to base temperature range (0°C to 30°C)
+        base_temperature = 15 + (raw_temperature * 15)  # 0°C to 30°C base range
+
         # Apply latitude influence (distance from equator)
         latitude_distance = abs(y - self.config.world_equator_y) / self.config.world_scale
-        latitude_cooling = self.config.temperature_latitude_influence * latitude_distance
-        
-        # Apply elevation cooling (higher elevations are cooler)
-        elevation_cooling = 0.3 * max(0.0, elevation - 0.5)  # Cooling starts above mid-elevation
-        
+        latitude_cooling = self.config.temperature_latitude_influence * latitude_distance * 60  # Scale to Celsius
+
+        # Apply elevation cooling (6.5°C per 1000m is realistic lapse rate)
+        elevation_cooling = max(0, elevation) * 0.0065  # 6.5°C per 1000m
+
         # Combine all temperature factors
         temperature = base_temperature - latitude_cooling - elevation_cooling
-        
-        return max(0.0, min(1.0, temperature))
+
+        return max(-20, min(40, temperature))
     
     def generate_chunk_environmental_data(self, chunk_x: int, chunk_y: int, size: int) -> List[List[EnvironmentalData]]:
         """

@@ -18,14 +18,14 @@ from .terrain import TerrainType
 @dataclass
 class OrganicTerrainData:
     """Enhanced terrain data with organic features."""
-    
+
     terrain_type: TerrainType
     character: str
     foreground_color: Tuple[int, int, int]
     background_color: Tuple[int, int, int]
-    elevation: float
-    moisture: float
-    temperature: float
+    elevation: float      # In meters
+    moisture: float       # 0.0 to 1.0
+    temperature: float    # In Celsius
 
 
 # Character variations for each terrain type to create organic appearance
@@ -178,14 +178,15 @@ class OrganicWorldGenerator:
         self.noise_water = OrganicNoiseGenerator(self.seed + 4000)
         self.noise_transition = OrganicNoiseGenerator(self.seed + 5000)
         
-        # Enhanced scales for large-scale terrain features
-        self.continent_scale = 0.0005  # Very large landmasses
-        self.biome_scale = 0.002       # Large biome features (4+ chunks)
-        self.regional_scale = 0.008    # Regional variations within biomes
-        self.local_scale = 0.05        # Fine texture details
-        self.water_scale = 0.015       # Water body scale
-        self.transition_scale = 0.01   # Biome transition smoothing (tighter)
-        self.river_scale = 0.001       # River network scale
+        # Enhanced scales for realistic 1m² coordinate system
+        # Much smaller scales for gradual elevation changes (10-50cm per meter)
+        self.continent_scale = 0.0001  # Very gradual continental features
+        self.biome_scale = 0.0005      # Large biome features
+        self.regional_scale = 0.002    # Regional variations within biomes
+        self.local_scale = 0.01        # Fine texture details
+        self.water_scale = 0.003       # Water body scale
+        self.transition_scale = 0.005  # Biome transition smoothing
+        self.river_scale = 0.0002      # River network scale
     
     def generate_chunk_data(self, chunk_x: int, chunk_y: int, chunk_size: int) -> Dict[Tuple[int, int], OrganicTerrainData]:
         """Generate organic terrain data for a chunk with large-scale features."""
@@ -222,9 +223,9 @@ class OrganicWorldGenerator:
                 biome_influence = biome_map[local_y][local_x]
                 is_river = river_map[local_y][local_x]
 
-                # Rivers override terrain
+                # Rivers override terrain (elevation now in meters)
                 if is_river:
-                    terrain_type = TerrainType.SHALLOW_WATER if elevation > 0.3 else TerrainType.DEEP_WATER
+                    terrain_type = TerrainType.SHALLOW_WATER if elevation > 100 else TerrainType.DEEP_WATER
                 else:
                     # Determine terrain type with large-scale biome influence and transitions
                     terrain_type = self._determine_terrain_with_large_scale_transitions(
@@ -392,35 +393,44 @@ class OrganicWorldGenerator:
         return river_map
 
     def _generate_elevation_map(self, world_x: int, world_y: int, size: int) -> List[List[float]]:
-        """Generate elevation using multi-octave noise."""
+        """Generate elevation in meters using multi-octave noise."""
         elevation_map = []
-        
+
         for y in range(size):
             row = []
             for x in range(size):
                 world_pos_x = (world_x + x) * self.continent_scale
                 world_pos_y = (world_y + y) * self.continent_scale
-                
+
                 elevation = self.noise_elevation.octave_noise(
-                    world_pos_x, world_pos_y, 
-                    octaves=5, 
-                    persistence=0.6, 
+                    world_pos_x, world_pos_y,
+                    octaves=5,
+                    persistence=0.6,
                     lacunarity=2.0
                 )
-                
-                # Normalize and apply curve for better distribution
-                elevation = (elevation + 1) / 2
-                elevation = max(0.0, min(1.0, elevation))  # Ensure valid range
 
-                if elevation < 0.5:
-                    elevation = math.pow(elevation * 2, 1.5) * 0.5
+                # Convert from [-1, 1] to [0, 1]
+                normalized = (elevation + 1) / 2
+                normalized = max(0.0, min(1.0, normalized))
+
+                # Convert to meters with distribution favoring more mountains
+                if normalized < 0.25:
+                    # Lower 25%: underwater and caves (-200 to 0m)
+                    curved = math.pow(normalized / 0.25, 1.5) * 0.25
+                    elevation_meters = -200 + curved * 200
+                elif normalized < 0.5:
+                    # Next 25%: low land (0 to 600m)
+                    curved = (normalized - 0.25) / 0.25
+                    elevation_meters = curved * 600
                 else:
-                    elevation = 0.5 + math.pow((elevation - 0.5) * 2, 0.7) * 0.5
-                
-                elevation = max(0, min(1, elevation))
-                row.append(elevation)
+                    # Upper 50%: hills and mountains (600 to 3000m) - more mountains!
+                    curved = math.pow((normalized - 0.5) / 0.5, 0.6)
+                    elevation_meters = 600 + curved * 2400
+
+                elevation_meters = max(-200, min(3000, elevation_meters))
+                row.append(elevation_meters)
             elevation_map.append(row)
-        
+
         return elevation_map
     
     def _generate_moisture_map(self, world_x: int, world_y: int, size: int) -> List[List[float]]:
@@ -447,31 +457,33 @@ class OrganicWorldGenerator:
         return moisture_map
     
     def _generate_temperature_map(self, world_x: int, world_y: int, size: int) -> List[List[float]]:
-        """Generate temperature with latitude influence."""
+        """Generate temperature in Celsius with latitude influence."""
         temperature_map = []
-        
+
         for y in range(size):
             row = []
             for x in range(size):
                 world_pos_x = (world_x + x) * self.regional_scale
                 world_pos_y = (world_y + y) * self.regional_scale
-                
-                # Latitude-based temperature
-                latitude_factor = 0.7 - abs(((world_y + y) * 0.0005) % 2.0 - 1.0)
-                
-                # Add noise variation
+
+                # Base temperature from noise (-20°C to 40°C range)
                 temp_noise = self.noise_temperature.octave_noise(
                     world_pos_x, world_pos_y,
                     octaves=3,
                     persistence=0.4,
                     lacunarity=2.0
-                ) * 0.3
-                
-                temperature = latitude_factor + temp_noise
-                temperature = max(0, min(1, temperature))
+                )
+                base_temperature = 10 + (temp_noise * 20)  # -10°C to 30°C base
+
+                # Latitude-based cooling (distance from equator)
+                latitude_distance = abs(((world_y + y) * 0.0005) % 2.0 - 1.0)
+                latitude_cooling = latitude_distance * 25  # Up to 25°C cooling
+
+                temperature = base_temperature - latitude_cooling
+                temperature = max(-20, min(40, temperature))
                 row.append(temperature)
             temperature_map.append(row)
-        
+
         return temperature_map
 
     def _generate_water_bodies(self, elevation_map: List[List[float]], world_x: int, world_y: int, size: int) -> Tuple[List[List[float]], List[List[bool]]]:
@@ -491,12 +503,12 @@ class OrganicWorldGenerator:
                     lacunarity=2.0
                 )
 
-                # Dynamic water threshold based on elevation and noise
+                # Dynamic water threshold based on elevation and noise (now in meters)
                 base_elevation = elevation_map[y][x]
-                water_threshold = 0.35 + water_noise * 0.15
+                water_threshold = 20 + water_noise * 30  # 20m to 50m threshold
 
                 if base_elevation < water_threshold:
-                    elevation_map[y][x] = 0.25  # Sea level
+                    elevation_map[y][x] = 0  # Sea level
                     water_mask[y][x] = True
 
         return elevation_map, water_mask
@@ -535,19 +547,19 @@ class OrganicWorldGenerator:
                                                        biome_influence: Dict, world_x: int, world_y: int) -> TerrainType:
         """Determine terrain type with large-scale biome influence and smooth transitions."""
 
-        # Handle elevation-based overrides first
-        if elevation < 0.2:
+        # Handle elevation-based overrides first (elevation now in meters)
+        if elevation < -50:
             return TerrainType.CAVES
 
-        if 0.2 <= elevation <= 0.3:
-            if elevation < 0.25:
+        if -50 <= elevation <= 50:
+            if elevation < 0:
                 return TerrainType.DEEP_WATER
             else:
                 return TerrainType.SHALLOW_WATER
 
-        if elevation > 0.8:
+        if elevation > 630:   # Mountains start at ~630m (top 10% of elevations)
             return TerrainType.MOUNTAINS
-        elif elevation > 0.7:
+        elif elevation > 580:  # Hills start at ~580m
             return TerrainType.HILLS
 
         # Use biome influence for terrain selection with transitions

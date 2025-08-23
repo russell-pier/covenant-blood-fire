@@ -165,6 +165,8 @@ def register_layer_commands(registry: CommandRegistry, world_generator, instruct
         )
         registry.register_command(status_command)
 
+
+
     return layer_commands
 
 

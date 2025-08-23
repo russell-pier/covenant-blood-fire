@@ -73,9 +73,34 @@ class StatusBar:
         
         # Get terrain and resource info if available
         terrain_info = "Unknown Terrain"
-        resource_info = ""
+        resource_info = " | 💎 ---"  # Default static resource space
+        elevation_info = ""
+        temperature_info = ""
+
         if world_generator and cursor_pos:
             try:
+                # Get environmental data for elevation and temperature
+                if hasattr(world_generator, 'environmental_generator'):
+                    env_data = world_generator.environmental_generator.generate_environmental_data(
+                        cursor_pos[0], cursor_pos[1]
+                    )
+                    # Values are already in correct units - round elevation to nearest 10cm
+                    elevation_rounded = round(env_data.elevation, 1)
+                    elevation_info = f"⛰️ {elevation_rounded}m"
+                    temperature_info = f"🌡️ {int(env_data.temperature)}°C"
+                elif hasattr(world_generator, 'organic_generator'):
+                    # Get data from organic system
+                    organic_data = world_generator.organic_generator.generate_organic_chunk(
+                        cursor_pos[0] // 32, cursor_pos[1] // 32, 32
+                    )
+                    local_x = cursor_pos[0] % 32
+                    local_y = cursor_pos[1] % 32
+                    terrain_data = organic_data.get((local_x, local_y))
+                    if terrain_data:
+                        elevation_rounded = round(terrain_data.elevation, 1)
+                        elevation_info = f"⛰️ {elevation_rounded}m"
+                        temperature_info = f"🌡️ {int(terrain_data.temperature)}°C"
+
                 # Get layered terrain at cursor position for full info including resources
                 layered_terrain = world_generator.get_layered_terrain_at(cursor_pos[0], cursor_pos[1])
                 if layered_terrain:
@@ -103,21 +128,29 @@ class StatusBar:
                         terrain_type = terrain_data.terrain_type.name.replace('_', ' ').title()
                         terrain_info = f"🌍 {terrain_type}"
 
-                        # Check for resource at this position
+                        # Always show resource section (static space)
                         if hasattr(terrain_data, 'resource') and terrain_data.resource:
                             resource = terrain_data.resource
                             resource_name = resource.resource_type.value.replace('_', ' ').title()
                             rarity_emoji = {'common': '⚪', 'rare': '🔵', 'epic': '🟣'}
                             rarity_symbol = rarity_emoji.get(resource.rarity, '⚪')
-                            resource_info = f" | {rarity_symbol} {resource_name} ({resource.rarity})"
+                            resource_info = f" | 💎 {rarity_symbol} {resource_name} ({resource.rarity})"
+                        else:
+                            resource_info = f" | 💎 ---"
                 else:
                     # Fallback to basic terrain
                     terrain_type_basic = world_generator.get_terrain_at(cursor_pos[0], cursor_pos[1])
                     if terrain_type_basic:
                         terrain_name = terrain_type_basic.name.replace('_', ' ').title()
                         terrain_info = f"🌍 {terrain_name}"
+                    # Set default resource info for fallback
+                    if not resource_info:
+                        resource_info = f" | 💎 ---"
             except Exception as e:
                 terrain_info = "🌍 Terrain Info Unavailable"
+                # Set default resource info for error case
+                if not resource_info:
+                    resource_info = f" | 💎 ---"
         
         # Get current layer info
         layer_info = ""
@@ -130,8 +163,12 @@ class StatusBar:
                 layer_name = current_layer.name.title()
                 layer_info = f"🏔️ {layer_name}"
         
-        # Status bar content - terrain and resource info on left, layer on right
-        full_terrain_info = terrain_info + resource_info
+        # Status bar content - terrain, resource, elevation, and temperature info on left, layer on right
+        env_info = ""
+        if elevation_info and temperature_info:
+            env_info = f" | {elevation_info} | {temperature_info}"
+
+        full_terrain_info = terrain_info + resource_info + env_info
         console.print(
             content_x, content_y,
             full_terrain_info,

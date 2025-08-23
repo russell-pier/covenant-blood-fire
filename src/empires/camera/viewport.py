@@ -258,8 +258,20 @@ class Viewport:
         if not hasattr(world_generator, 'get_animal_positions'):
             return
 
-        # Get all animal positions
-        animal_positions = world_generator.get_animal_positions()
+        # Get animal positions based on current layer if layered system is enabled
+        if (hasattr(world_generator, 'use_layered_system') and
+            world_generator.use_layered_system and
+            hasattr(world_generator, 'get_current_layer') and
+            hasattr(world_generator, 'get_animal_positions_for_layer')):
+            # Get current layer and only show animals on that layer
+            current_layer = world_generator.get_current_layer()
+            if current_layer is not None:
+                animal_positions = world_generator.get_animal_positions_for_layer(current_layer)
+            else:
+                animal_positions = []
+        else:
+            # Fallback to all animals if layered system is not available
+            animal_positions = world_generator.get_animal_positions()
 
         # Render each animal
         for world_x, world_y, char, color in animal_positions:
