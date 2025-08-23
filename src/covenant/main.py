@@ -192,7 +192,16 @@ class Game:
             self.last_scale_switch_time = time.time()
             return
         elif key == tcod.event.KeySym.N2:
+            old_scale = self.multi_scale_camera.get_current_scale()
             self.multi_scale_camera.change_scale(ViewScale.REGIONAL)
+
+            # When switching to regional, center on the current world position
+            if old_scale == ViewScale.WORLD:
+                # Get world camera position and convert to regional coordinates
+                world_cam_x, world_cam_y = self.multi_scale_camera.get_camera_position()
+                # Center regional camera (16,16 is center of 32x32 regional view)
+                self.multi_scale_camera.set_camera_position(16, 16)
+
             self.last_scale_switch_time = time.time()
             return
         elif key == tcod.event.KeySym.N3:
@@ -235,9 +244,14 @@ class Game:
         # Drill down functionality
         if key == tcod.event.KeySym.RETURN or key == tcod.event.KeySym.KP_ENTER:
             if current_scale == ViewScale.WORLD:
+                # Drill down to regional view, centered on current world position
                 self.multi_scale_camera.change_scale(ViewScale.REGIONAL)
+                # Center regional camera
+                self.multi_scale_camera.set_camera_position(16, 16)
             elif current_scale == ViewScale.REGIONAL:
+                # Drill down to local view
                 self.multi_scale_camera.change_scale(ViewScale.LOCAL)
+                self._sync_legacy_to_multi_scale_camera()
             return
 
         # Info toggle for world/regional scales
@@ -273,27 +287,29 @@ class Game:
             self.running = False
 
     def _sync_multi_scale_to_legacy_camera(self) -> None:
-        """Sync multi-scale camera position to match legacy camera."""
+        """Sync multi-scale camera position to match legacy camera (less aggressive)."""
         world_x, world_y = self.legacy_camera.get_position()
 
-        # Update local scale position in multi-scale camera
-        local_x = world_x // 32  # Convert to chunk coordinates
-        local_y = world_y // 32
-
-        # Set multi-scale camera position for local scale
-        old_scale = self.multi_scale_camera.get_current_scale()
-        self.multi_scale_camera.change_scale(ViewScale.LOCAL)
-        self.multi_scale_camera.set_camera_position(local_x, local_y)
-        self.multi_scale_camera.change_scale(old_scale)
+        # Update local scale position in multi-scale camera (only for local scale)
+        if self.multi_scale_camera.get_current_scale() == ViewScale.LOCAL:
+            local_x = world_x // 32  # Convert to chunk coordinates
+            local_y = world_y // 32
+            self.multi_scale_camera.set_camera_position(local_x, local_y)
 
     def _sync_legacy_to_multi_scale_camera(self) -> None:
-        """Sync legacy camera position to match multi-scale camera."""
+        """Sync legacy camera position to match multi-scale camera when switching to local."""
         if self.multi_scale_camera.get_current_scale() == ViewScale.LOCAL:
+            # Get the center of the current multi-scale local chunk
             world_x, world_y = self.multi_scale_camera.get_current_world_coordinates()
-            self.legacy_camera.set_position(world_x, world_y)
+
+            # Center the legacy camera in that chunk (add half chunk size for centering)
+            centered_x = world_x + 16  # Half of 32-tile chunk
+            centered_y = world_y + 16
+
+            self.legacy_camera.set_position(centered_x, centered_y)
 
             # Update world generator
-            self.world_generator.update_camera_position(world_x, world_y)
+            self.world_generator.update_camera_position(centered_x, centered_y)
 
     def render(self) -> None:
         """Render the game using the multi-scale system."""
@@ -320,17 +336,8 @@ class Game:
 
     def _render_detailed_local_view(self) -> None:
         """Render detailed local view using existing systems."""
-        # Sync multi-scale camera position with legacy camera
-        multi_scale_world_x, multi_scale_world_y = self.multi_scale_camera.get_current_world_coordinates()
-
-        # Convert to local chunk coordinates and update legacy camera
-        local_chunk_x = multi_scale_world_x // 32  # 32 tiles per chunk
-        local_chunk_y = multi_scale_world_y // 32
-
-        # Set legacy camera to show the area around the multi-scale position
-        self.legacy_camera.set_position(multi_scale_world_x, multi_scale_world_y)
-
-        # Update map renderer
+        # Use the legacy camera position directly - don't sync from multi-scale
+        # This allows smooth tile-by-tile movement in local view
         camera_x, camera_y = self.legacy_camera.get_position()
         self.map_renderer.set_camera_position(camera_x, camera_y)
 

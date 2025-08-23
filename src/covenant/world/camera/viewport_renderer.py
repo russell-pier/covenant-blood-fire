@@ -102,56 +102,74 @@ class MultiScaleViewportRenderer:
                 if 0 <= x < console.width and 0 <= y < console.height:
                     console.print(x, y, " ", fg=(0, 0, 0), bg=(0, 0, 0))
     
-    def _render_world_view(self, console: tcod.console.Console, 
+    def _render_world_view(self, console: tcod.console.Console,
                           camera_x: int, camera_y: int) -> None:
         """
-        Render 16×16 world sector view.
-        
+        Render 16×16 world sector view with 2x2 scaling for better visibility.
+
         Args:
             console: tcod console to render to
             camera_x: Camera X position in world scale
             camera_y: Camera Y position in world scale
         """
         world_map = self.world_generator.generate_complete_world_map()
-        
-        # Calculate rendering offset to center the world map
-        world_width, world_height = world_map.world_size_sectors
-        start_x = (self.render_width - world_width) // 2
-        start_y = self.render_start_y + (self.render_height - world_height) // 2
-        
-        # Render world sectors
+
+        # Scale factor for better visibility (2x2 = 4 characters per sector)
+        scale_factor = 2
+        scaled_width = world_map.world_size_sectors[0] * scale_factor
+        scaled_height = world_map.world_size_sectors[1] * scale_factor
+
+        # Calculate rendering offset to center the scaled world map
+        start_x = (self.render_width - scaled_width) // 2
+        start_y = self.render_start_y + (self.render_height - scaled_height) // 2
+
+        # Render world sectors with scaling
         for (sector_x, sector_y), sector_data in world_map.sectors.items():
-            render_x = start_x + sector_x
-            render_y = start_y + sector_y
-            
-            if (0 <= render_x < console.width and 
-                0 <= render_y < console.height):
-                
-                # Highlight current camera position
-                if sector_x == camera_x and sector_y == camera_y:
-                    # Bright highlight for camera position
-                    bg_color = (100, 100, 0)  # Yellow background
-                    fg_color = (255, 255, 255)  # White foreground
-                else:
-                    bg_color = sector_data.display_bg_color
-                    fg_color = sector_data.display_color
-                
-                console.print(
-                    render_x, render_y,
-                    sector_data.display_char,
-                    fg=fg_color,
-                    bg=bg_color
-                )
-        
-        # Render camera crosshair (optional additional indicator)
-        crosshair_x = start_x + camera_x
-        crosshair_y = start_y + camera_y
-        
-        if (0 <= crosshair_x < console.width and 
-            0 <= crosshair_y < console.height):
-            # Add a subtle crosshair overlay
-            console.print(crosshair_x, crosshair_y, "⊕", 
-                         fg=(255, 255, 0), bg=None)
+            # Calculate scaled position
+            base_x = start_x + (sector_x * scale_factor)
+            base_y = start_y + (sector_y * scale_factor)
+
+            # Determine colors
+            if sector_x == camera_x and sector_y == camera_y:
+                # Bright highlight for camera position
+                bg_color = (120, 120, 0)  # Yellow background
+                fg_color = (255, 255, 255)  # White foreground
+                char = "⊕"  # Special cursor character
+            else:
+                bg_color = sector_data.display_bg_color
+                fg_color = sector_data.display_color
+                char = sector_data.display_char
+
+            # Render 2x2 block for each sector
+            for dy in range(scale_factor):
+                for dx in range(scale_factor):
+                    render_x = base_x + dx
+                    render_y = base_y + dy
+
+                    if (0 <= render_x < console.width and
+                        0 <= render_y < console.height):
+
+                        # Use different characters for visual variety in the 2x2 block
+                        if sector_x == camera_x and sector_y == camera_y:
+                            # Cursor gets special treatment
+                            if dx == 0 and dy == 0:
+                                display_char = "⊕"
+                            elif dx == 1 and dy == 0:
+                                display_char = "⊖"
+                            elif dx == 0 and dy == 1:
+                                display_char = "⊗"
+                            else:
+                                display_char = "⊙"
+                        else:
+                            # Normal terrain uses same character for consistency
+                            display_char = char
+
+                        console.print(
+                            render_x, render_y,
+                            display_char,
+                            fg=fg_color,
+                            bg=bg_color
+                        )
     
     def _render_regional_view(self, console: tcod.console.Console,
                              camera_x: int, camera_y: int) -> None:
@@ -177,16 +195,15 @@ class MultiScaleViewportRenderer:
                                         32, 32, camera_x, camera_y)
             return
 
-        # Calculate rendering area
-        available_width = min(self.render_width - 4, 32)
-        available_height = min(self.render_height - 6, 32)
+        # Calculate rendering area - use more space for regional view
+        max_display_size = min(self.render_width - 4, self.render_height - 8, 32)
 
-        start_x = (self.render_width - available_width) // 2
-        start_y = self.render_start_y + 3
+        start_x = (self.render_width - max_display_size) // 2
+        start_y = self.render_start_y + 4
 
         # Render regional blocks
-        for y in range(available_height):
-            for x in range(available_width):
+        for y in range(max_display_size):
+            for x in range(max_display_size):
                 if x < 32 and y < 32:  # Within regional map bounds
                     block_data = regional_map.get_block(x, y)
 
@@ -197,11 +214,11 @@ class MultiScaleViewportRenderer:
                         0 <= render_y < console.height):
 
                         if block_data:
-                            # Highlight camera position
+                            # Highlight camera position with bright cursor
                             if x == camera_x and y == camera_y:
                                 char = "⊕"
                                 fg = (255, 255, 0)
-                                bg = (100, 100, 0)
+                                bg = (120, 120, 0)
                             else:
                                 char = block_data.display_char
                                 fg = block_data.display_color
@@ -214,11 +231,17 @@ class MultiScaleViewportRenderer:
 
                         console.print(render_x, render_y, char, fg=fg, bg=bg)
 
-        # Render title
+        # Render title and position info
         title = f"REGIONAL VIEW - Sector ({sector_x},{sector_y})"
         title_x = (self.render_width - len(title)) // 2
         if 0 <= title_x < console.width:
             console.print(title_x, self.render_start_y + 1, title, fg=(255, 255, 255))
+
+        # Show current regional position
+        pos_info = f"Regional Position: ({camera_x},{camera_y})"
+        pos_x = (self.render_width - len(pos_info)) // 2
+        if 0 <= pos_x < console.width:
+            console.print(pos_x, self.render_start_y + 2, pos_info, fg=(200, 200, 200))
     
     def _render_local_view(self, console: tcod.console.Console,
                           camera_x: int, camera_y: int) -> None:
