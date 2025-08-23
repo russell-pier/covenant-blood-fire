@@ -9,7 +9,14 @@ import os
 import random
 import time
 from typing import Optional, Dict, Any
-import toml
+
+# Try to import toml, fall back to basic config if not available
+try:
+    import toml
+    HAS_TOML = True
+except ImportError:
+    HAS_TOML = False
+    print("Warning: toml module not found. Using basic configuration fallback.")
 
 
 class WorldConfig:
@@ -28,12 +35,17 @@ class WorldConfig:
     
     def _load_configs(self) -> None:
         """Load all configuration files from config directory."""
+        if not HAS_TOML:
+            # Use basic fallback configuration
+            print("Using basic configuration fallback (no TOML support)")
+            return
+
         config_files = [
             "environmental.toml",
             "visual.toml",
             "world.toml"  # New config file for world generation
         ]
-        
+
         for config_file in config_files:
             config_path = os.path.join(self.config_dir, config_file)
             if os.path.exists(config_path):
@@ -155,8 +167,12 @@ def get_world_config() -> WorldConfig:
 
 def create_world_config_file() -> None:
     """Create a default world.toml configuration file if it doesn't exist."""
+    if not HAS_TOML:
+        print("Skipping config file creation (no TOML support)")
+        return
+
     config_path = os.path.join("config", "world.toml")
-    
+
     if not os.path.exists(config_path):
         os.makedirs("config", exist_ok=True)
         
