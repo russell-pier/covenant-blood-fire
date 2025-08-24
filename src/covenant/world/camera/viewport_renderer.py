@@ -32,7 +32,7 @@ class MultiScaleViewportRenderer:
         # Initialize regional generator
         self.regional_generator = RegionalScaleGenerator(world_generator)
         
-        # Console dimensions (maintain existing layout)
+        # Console dimensions (maintain existing layout, but world view needs more space)
         self.console_width = 80
         self.console_height = 50
         
@@ -105,7 +105,8 @@ class MultiScaleViewportRenderer:
     def _render_world_view(self, console: tcod.console.Console,
                           camera_x: int, camera_y: int) -> None:
         """
-        Render 16×16 world sector view with 2x2 scaling for better visibility.
+        Render world view where each sector is displayed as 16×16 characters.
+        Total display: 8×6 sectors = 128×96 characters.
 
         Args:
             console: tcod console to render to
@@ -114,62 +115,91 @@ class MultiScaleViewportRenderer:
         """
         world_map = self.world_generator.generate_complete_world_map()
 
-        # Scale factor for better visibility (2x2 = 4 characters per sector)
-        scale_factor = 2
-        scaled_width = world_map.world_size_sectors[0] * scale_factor
-        scaled_height = world_map.world_size_sectors[1] * scale_factor
+        # Each sector is rendered as 16×16 characters
+        sector_display_size = 16
+        total_width = world_map.world_size_sectors[0] * sector_display_size  # 8 * 16 = 128
+        total_height = world_map.world_size_sectors[1] * sector_display_size  # 6 * 16 = 96
 
-        # Calculate rendering offset to center the scaled world map
-        start_x = (self.render_width - scaled_width) // 2
-        start_y = self.render_start_y + (self.render_height - scaled_height) // 2
+        # Calculate rendering offset (may need scrolling for large displays)
+        start_x = max(0, (self.render_width - total_width) // 2)
+        start_y = max(self.render_start_y, self.render_start_y + (self.render_height - total_height) // 2)
 
-        # Render world sectors with scaling
+        # Generate regional data for each sector to fill the 16×16 display
         for (sector_x, sector_y), sector_data in world_map.sectors.items():
-            # Calculate scaled position
-            base_x = start_x + (sector_x * scale_factor)
-            base_y = start_y + (sector_y * scale_factor)
+            # Calculate base position for this sector
+            sector_base_x = start_x + (sector_x * sector_display_size)
+            sector_base_y = start_y + (sector_y * sector_display_size)
 
-            # Determine colors
-            if sector_x == camera_x and sector_y == camera_y:
-                # Bright highlight for camera position
-                bg_color = (120, 120, 0)  # Yellow background
-                fg_color = (255, 255, 255)  # White foreground
-                char = "⊕"  # Special cursor character
-            else:
-                bg_color = sector_data.display_bg_color
-                fg_color = sector_data.display_color
-                char = sector_data.display_char
+            # Generate regional map for this sector to get detailed terrain
+            try:
+                regional_map = self.regional_generator.generate_regional_map(sector_x, sector_y)
 
-            # Render 2x2 block for each sector
-            for dy in range(scale_factor):
-                for dx in range(scale_factor):
-                    render_x = base_x + dx
-                    render_y = base_y + dy
+                # Sample 16×16 points from the 32×32 regional map (every other point)
+                for display_y in range(sector_display_size):
+                    for display_x in range(sector_display_size):
+                        # Map display coordinates to regional coordinates (sample every 2nd point)
+                        regional_x = (display_x * 32) // sector_display_size
+                        regional_y = (display_y * 32) // sector_display_size
 
-                    if (0 <= render_x < console.width and
-                        0 <= render_y < console.height):
+                        render_x = sector_base_x + display_x
+                        render_y = sector_base_y + display_y
 
-                        # Use different characters for visual variety in the 2x2 block
-                        if sector_x == camera_x and sector_y == camera_y:
-                            # Cursor gets special treatment
-                            if dx == 0 and dy == 0:
-                                display_char = "⊕"
-                            elif dx == 1 and dy == 0:
-                                display_char = "⊖"
-                            elif dx == 0 and dy == 1:
-                                display_char = "⊗"
+                        # Check if within console bounds
+                        if (0 <= render_x < console.width and
+                            0 <= render_y < console.height):
+
+                            # Get regional block data
+                            block_data = regional_map.get_block(regional_x, regional_y)
+
+                            if block_data:
+                                char = block_data.display_char
+                                fg_color = block_data.display_color
+                                bg_color = block_data.display_bg_color
                             else:
-                                display_char = "⊙"
-                        else:
-                            # Normal terrain uses same character for consistency
-                            display_char = char
+                                # Fallback to sector data
+                                char = sector_data.display_char
+                                fg_color = sector_data.display_color
+                                bg_color = sector_data.display_bg_color
 
-                        console.print(
-                            render_x, render_y,
-                            display_char,
-                            fg=fg_color,
-                            bg=bg_color
-                        )
+                            # Highlight current camera sector
+                            if sector_x == camera_x and sector_y == camera_y:
+                                # Add cursor overlay in center of current sector
+                                if (display_x == sector_display_size // 2 and
+                                    display_y == sector_display_size // 2):
+                                    char = "⊕"
+                                    fg_color = (255, 255, 0)
+                                    bg_color = (120, 120, 0)
+                                else:
+                                    # Brighten the current sector
+                                    fg_color = tuple(min(255, c + 50) for c in fg_color)
+
+                            console.print(render_x, render_y, char, fg=fg_color, bg=bg_color)
+
+            except Exception as e:
+                # Fallback: fill sector with basic terrain pattern
+                for display_y in range(sector_display_size):
+                    for display_x in range(sector_display_size):
+                        render_x = sector_base_x + display_x
+                        render_y = sector_base_y + display_y
+
+                        if (0 <= render_x < console.width and
+                            0 <= render_y < console.height):
+
+                            char = sector_data.display_char
+                            fg_color = sector_data.display_color
+                            bg_color = sector_data.display_bg_color
+
+                            # Highlight current camera sector
+                            if sector_x == camera_x and sector_y == camera_y:
+                                if (display_x == sector_display_size // 2 and
+                                    display_y == sector_display_size // 2):
+                                    char = "⊕"
+                                    fg_color = (255, 255, 0)
+                                    bg_color = (120, 120, 0)
+                                else:
+                                    fg_color = tuple(min(255, c + 50) for c in fg_color)
+
+                            console.print(render_x, render_y, char, fg=fg_color, bg=bg_color)
     
     def _render_regional_view(self, console: tcod.console.Console,
                              camera_x: int, camera_y: int) -> None:
@@ -319,36 +349,50 @@ class MultiScaleViewportRenderer:
     def _render_scale_ui(self, console: tcod.console.Console) -> None:
         """
         Render scale indicator and controls.
-        
+
         Args:
             console: tcod console to render to
         """
         current_scale = self.camera_system.get_current_scale()
         camera_x, camera_y = self.camera_system.get_camera_position()
         world_x, world_y = self.camera_system.get_current_world_coordinates()
-        
-        # Scale indicator (top-right of rendering area)
-        scale_text = f"Scale: {current_scale.value.title()}"
-        position_text = f"Pos: {camera_x},{camera_y}"
-        world_pos_text = f"World: {world_x},{world_y}"
-        
-        info_x = max(0, console.width - 30)
-        
-        if info_x < console.width:
-            console.print(info_x, self.render_start_y, 
-                         scale_text, fg=(255, 255, 0))
-            console.print(info_x, self.render_start_y + 1, 
-                         position_text, fg=(200, 200, 200))
-            console.print(info_x, self.render_start_y + 2, 
-                         world_pos_text, fg=(150, 150, 150))
-        
-        # Controls reminder (bottom of rendering area)
-        controls_y = self.render_end_y - 1
-        controls_text = "1=World 2=Region 3=Local | WASD=Move | Enter=Drill"
-        controls_x = max(0, (console.width - len(controls_text)) // 2)
-        
-        if 0 <= controls_y < console.height and controls_x < console.width:
-            console.print(controls_x, controls_y, controls_text, fg=(120, 120, 120))
+
+        # For world view, show different info since it's much larger
+        if current_scale == ViewScale.WORLD:
+            # Show info at top of screen
+            scale_text = f"WORLD VIEW - Sector ({camera_x},{camera_y}) - 128×96 display"
+            if len(scale_text) < console.width:
+                info_x = (console.width - len(scale_text)) // 2
+                console.print(info_x, 1, scale_text, fg=(255, 255, 0))
+
+            # Controls at bottom
+            controls_text = "1=World 2=Region 3=Local | WASD=Move | Enter=Drill | I=Info"
+            if len(controls_text) < console.width:
+                controls_x = (console.width - len(controls_text)) // 2
+                console.print(controls_x, console.height - 2, controls_text, fg=(120, 120, 120))
+        else:
+            # Standard UI for regional/local views
+            scale_text = f"Scale: {current_scale.value.title()}"
+            position_text = f"Pos: {camera_x},{camera_y}"
+            world_pos_text = f"World: {world_x},{world_y}"
+
+            info_x = max(0, console.width - 30)
+
+            if info_x < console.width:
+                console.print(info_x, self.render_start_y,
+                             scale_text, fg=(255, 255, 0))
+                console.print(info_x, self.render_start_y + 1,
+                             position_text, fg=(200, 200, 200))
+                console.print(info_x, self.render_start_y + 2,
+                             world_pos_text, fg=(150, 150, 150))
+
+            # Controls reminder (bottom of rendering area)
+            controls_y = self.render_end_y - 1
+            controls_text = "1=World 2=Region 3=Local | WASD=Move | Enter=Drill"
+            controls_x = max(0, (console.width - len(controls_text)) // 2)
+
+            if 0 <= controls_y < console.height and controls_x < console.width:
+                console.print(controls_x, controls_y, controls_text, fg=(120, 120, 120))
     
     def get_render_bounds(self) -> Tuple[int, int, int, int]:
         """

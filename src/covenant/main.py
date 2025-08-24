@@ -27,8 +27,9 @@ class Game:
         self.screen_width, self.screen_height = self._get_terminal_size()
 
         # Minimum dimensions to ensure UI works properly
-        self.min_width = 60
-        self.min_height = 30
+        # World view needs 128×96, so set larger minimums
+        self.min_width = 130  # 128 + 2 for margins
+        self.min_height = 100  # 96 + 4 for UI
 
         # Ensure minimum dimensions
         self.screen_width = max(self.screen_width, self.min_width)
