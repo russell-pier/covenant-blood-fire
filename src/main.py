@@ -101,6 +101,55 @@ class Game:
             # Fallback to default size if terminal size detection fails
             return 128, 96
 
+    def _handle_window_resize(self, context) -> bool:
+        """
+        Handle window resize by expanding the character grid.
+
+        Args:
+            context: The tcod context to check for resize
+
+        Returns:
+            True if resize occurred
+        """
+        current_time = time.time()
+
+        # Get recommended console size based on current window size
+        try:
+            recommended_size = context.recommended_console_size()
+        except:
+            return False
+
+        # Only process resize if enough time has passed and size is different
+        if (recommended_size != self.stable_size and
+            current_time - self.last_resize_time > self.resize_debounce_delay):
+
+            new_width, new_height = recommended_size
+            if new_width > 0 and new_height > 0:
+                # Ensure minimum dimensions
+                new_width = max(new_width, self.min_width)
+                new_height = max(new_height, self.min_height)
+
+                # Only resize if dimensions actually changed
+                if new_width != self.screen_width or new_height != self.screen_height:
+                    print(f"Window resized: {new_width}x{new_height} characters")
+
+                    self.screen_width = new_width
+                    self.screen_height = new_height
+
+                    # Create new console with expanded character grid
+                    self.console = tcod.console.Console(self.screen_width, self.screen_height)
+
+                    # Update view manager with new dimensions
+                    self.view_manager.handle_resize(new_width, new_height)
+
+                    # Update stable size and timing
+                    self.stable_size = (new_width, new_height)
+                    self.last_resize_time = current_time
+
+                    return True
+
+        return False
+
     def quit(self) -> None:
         """Quit the game."""
         self.running = False
@@ -170,18 +219,22 @@ class Game:
         console = self.setup_console()
 
         try:
-            # Try to create a window context with built-in font
+            # Create context that supports responsive character grid sizing
             with tcod.context.new(
                 columns=console.width,
                 rows=console.height,
-                title="Three-Tier World Generation System",
+                title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
                 vsync=True,
             ) as context:
 
                 print("✓ Game window created successfully")
                 print("Controls: 1/2/3 = Scale switching, WASD = Movement, ESC = Quit")
+                print("Resize window to expand the character grid!")
 
                 while self.running:
+                    # Check for window resize (character grid expansion)
+                    self._handle_window_resize(context)
+
                     # Handle events
                     self.handle_events()
 
@@ -192,7 +245,7 @@ class Game:
                     self.render()
 
                     # Present to screen
-                    context.present(console)
+                    context.present(self.console)
 
                     # Maintain 60 FPS
                     time.sleep(1.0 / 60.0)
