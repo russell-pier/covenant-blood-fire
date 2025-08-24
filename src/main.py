@@ -218,37 +218,37 @@ class Game:
         # Set up console
         console = self.setup_console()
 
+        # Create context that supports responsive character grid sizing
+        context = tcod.context.new(
+            columns=console.width,
+            rows=console.height,
+            title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
+            vsync=True,
+        )
+
         try:
-            # Create context that supports responsive character grid sizing
-            with tcod.context.new(
-                columns=console.width,
-                rows=console.height,
-                title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
-                vsync=True,
-            ) as context:
+            print("✓ Game window created successfully")
+            print("Controls: 1/2/3 = Scale switching, WASD = Movement, ESC = Quit")
+            print("Resize window to expand the character grid!")
 
-                print("✓ Game window created successfully")
-                print("Controls: 1/2/3 = Scale switching, WASD = Movement, ESC = Quit")
-                print("Resize window to expand the character grid!")
+            while self.running:
+                # Check for window resize (character grid expansion)
+                self._handle_window_resize(context)
 
-                while self.running:
-                    # Check for window resize (character grid expansion)
-                    self._handle_window_resize(context)
+                # Handle events
+                self.handle_events()
 
-                    # Handle events
-                    self.handle_events()
+                # Update systems
+                self.update()
 
-                    # Update systems
-                    self.update()
+                # Render
+                self.render()
 
-                    # Render
-                    self.render()
+                # Present to screen
+                context.present(self.console)
 
-                    # Present to screen
-                    context.present(self.console)
-
-                    # Maintain 60 FPS
-                    time.sleep(1.0 / 60.0)
+                # Maintain 60 FPS
+                time.sleep(1.0 / 60.0)
 
         except (RuntimeError, FileNotFoundError) as e:
             print("Display/font loading failed - running in test mode")
@@ -281,6 +281,10 @@ class Game:
 
             print("✓ All systems functional - ready for display environment")
             return
+        finally:
+            # Clean up context
+            if 'context' in locals():
+                context.close()
 
 
 def main(seed: int = 12345) -> None:
