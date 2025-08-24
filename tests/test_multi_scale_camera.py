@@ -158,7 +158,7 @@ class TestMultiScaleCameraSystem:
         # Check all scales are centered
         camera.change_scale(ViewScale.WORLD)
         x, y = camera.get_camera_position()
-        assert x == 8 and y == 8
+        assert x == 4 and y == 3  # Center of 8×6 world
         
         camera.change_scale(ViewScale.REGIONAL)
         x, y = camera.get_camera_position()

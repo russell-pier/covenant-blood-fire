@@ -31,8 +31,8 @@ class MultiScaleCameraSystem:
         }
         
         # Independent camera positions for each scale (in scale units)
-        self.world_camera_x = 8      # Center of 16×16 world
-        self.world_camera_y = 8
+        self.world_camera_x = 4      # Center of 8×6 world
+        self.world_camera_y = 3
         self.regional_camera_x = 16  # Center of 32×32 region
         self.regional_camera_y = 16
         self.local_camera_x = 16     # Center of 32×32 local area

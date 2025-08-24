@@ -100,23 +100,23 @@ class TestWorldScaleGenerator:
         generator = WorldScaleGenerator(seed=12345)
         world_map = generator.generate_complete_world_map()
         
-        assert world_map.world_size_sectors == (16, 16)
-        assert len(world_map.sectors) == 256  # 16×16
+        assert world_map.world_size_sectors == (8, 6)
+        assert len(world_map.sectors) == 48  # 8×6
         assert world_map.generation_complete
         assert world_map.is_complete()
         
         # Check that all sectors are within bounds
         for (sector_x, sector_y) in world_map.sectors.keys():
-            assert 0 <= sector_x < 16
-            assert 0 <= sector_y < 16
+            assert 0 <= sector_x < 8
+            assert 0 <= sector_y < 6
     
     def test_sector_generation(self):
         """Test individual sector generation."""
         generator = WorldScaleGenerator(seed=12345)
         
         # Generate a few test sectors
-        for sector_x in [0, 5, 10, 15]:
-            for sector_y in [0, 5, 10, 15]:
+        for sector_x in [0, 3, 7]:
+            for sector_y in [0, 2, 5]:
                 sector = generator.generate_world_sector(sector_x, sector_y)
                 
                 assert sector.sector_x == sector_x

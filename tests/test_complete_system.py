@@ -136,7 +136,7 @@ class TestCompleteSystemIntegration:
         world_map = self.world_generator.generate_complete_world_map()
         
         # Test regional generation for several sectors
-        test_sectors = [(0, 0), (5, 5), (10, 10), (15, 15)]
+        test_sectors = [(0, 0), (3, 2), (7, 5)]
         
         for sector_x, sector_y in test_sectors:
             sector_data = world_map.get_sector(sector_x, sector_y)

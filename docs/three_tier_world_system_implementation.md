@@ -4,7 +4,7 @@
 
 Successfully implemented a complete three-tier hierarchical world generation system for Covenant: Blood & Fire, replacing the previous single-scale system with a multi-scale approach supporting:
 
-- **World View**: 16×16 sectors showing continental features
+- **World View**: 8×6 sectors showing continental features
 - **Regional View**: 32×32 blocks showing regional terrain 
 - **Local View**: 32×32 chunks showing detailed terrain (integrated with existing systems)
 

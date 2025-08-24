@@ -89,8 +89,8 @@ class WorldConfig:
             if isinstance(size, list) and len(size) == 2:
                 return tuple(size)
         
-        # Default world size
-        return (16, 16)
+        # Default world size - 8×6 sectors for better aspect ratio
+        return (8, 6)
     
     def get_noise_config(self) -> Dict[str, Any]:
         """
@@ -183,7 +183,8 @@ def create_world_config_file() -> None:
 # seed = 12345
 
 # World size in sectors (each sector is 16,384 x 16,384 tiles)
-size = [16, 16]
+# 8x6 = 128x96 tiles at world view, better aspect ratio
+size = [8, 6]
 
 [development]
 # Enable development mode features

@@ -180,7 +180,7 @@ class TestSystemIntegration:
         assert generation_time < 5.0
         
         # Should have generated all sectors
-        assert len(world_map.sectors) == 256
+        assert len(world_map.sectors) == 48  # 8×6
         
         # Test camera movement performance
         start_time = time.time()

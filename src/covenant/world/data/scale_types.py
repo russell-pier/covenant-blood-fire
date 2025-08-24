@@ -44,8 +44,8 @@ class ScaleConfig:
 
 # Default scale configurations
 DEFAULT_SCALE_CONFIGS = {
-    ViewScale.WORLD: ScaleConfig("World", 16384, (16, 16), 300.0),
-    ViewScale.REGIONAL: ScaleConfig("Regional", 1024, (32, 32), 60.0), 
+    ViewScale.WORLD: ScaleConfig("World", 16384, (8, 6), 300.0),
+    ViewScale.REGIONAL: ScaleConfig("Regional", 1024, (32, 32), 60.0),
     ViewScale.LOCAL: ScaleConfig("Local", 32, (32, 32), 10.0)
 }
 
