@@ -221,8 +221,8 @@ class InputHandler:
     
     def _toggle_help(self) -> None:
         """Toggle help display."""
-        # Toggle bottom bar help (if implemented)
-        self.view_manager.toggle_ui_component('bottom_bar')
+        # Toggle instructions panel
+        self.view_manager.toggle_ui_component('instructions_panel')
     
     def set_movement_speed(self, speed: int) -> None:
         """

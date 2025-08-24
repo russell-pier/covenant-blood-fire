@@ -7,6 +7,7 @@ and maintains 60 FPS performance.
 """
 
 import time
+import shutil
 from typing import Optional
 
 import tcod
@@ -37,11 +38,25 @@ class Game:
         Args:
             seed: World generation seed
         """
-        self.console_width = 128
-        self.console_height = 96
+        # Get responsive terminal size
+        self.screen_width, self.screen_height = self._get_terminal_size()
+
+        # Minimum dimensions to ensure UI works properly
+        self.min_width = 130  # 128 + 2 for margins
+        self.min_height = 100  # 96 + 4 for UI
+
+        # Ensure minimum dimensions
+        self.screen_width = max(self.screen_width, self.min_width)
+        self.screen_height = max(self.screen_height, self.min_height)
+
         self.running = True
         self.console: Optional[tcod.console.Console] = None
         self.seed = seed
+
+        # Resize tracking
+        self.stable_size = (self.screen_width, self.screen_height)
+        self.last_resize_time = 0
+        self.resize_debounce_delay = 0.1
 
         # Generate world data
         print(f"Generating world with seed {seed}...")
@@ -51,8 +66,8 @@ class Game:
 
         # Initialize view manager
         self.view_manager = ViewManager(
-            self.console_width,
-            self.console_height,
+            self.screen_width,
+            self.screen_height,
             self.world_data
         )
 
@@ -63,6 +78,28 @@ class Game:
         )
 
         print("✓ All systems initialized")
+
+    def _get_terminal_size(self) -> tuple[int, int]:
+        """
+        Get the current terminal size with fallback to reasonable defaults.
+
+        Returns:
+            Tuple of (width, height) in characters
+        """
+        try:
+            # Try to get terminal size
+            size = shutil.get_terminal_size()
+            width = size.columns
+            height = size.lines
+
+            # Apply reasonable bounds
+            width = max(80, min(width, 300))  # Between 80 and 300 columns
+            height = max(24, min(height, 100))  # Between 24 and 100 lines
+
+            return width, height
+        except (OSError, AttributeError):
+            # Fallback to default size if terminal size detection fails
+            return 128, 96
 
     def quit(self) -> None:
         """Quit the game."""
@@ -76,8 +113,8 @@ class Game:
             The initialized console instance.
         """
         self.console = tcod.console.Console(
-            self.console_width,
-            self.console_height
+            self.screen_width,
+            self.screen_height
         )
         return self.console
 

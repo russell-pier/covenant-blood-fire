@@ -269,8 +269,8 @@ class TestViewManager:
         result = view_manager.handle_mouse_click(click_x, click_y)
         assert isinstance(result, bool)
         
-        # Test click outside main area (should not be handled)
-        result = view_manager.handle_mouse_click(0, 0)
+        # Test click outside console bounds (should not be handled)
+        result = view_manager.handle_mouse_click(-1, -1)
         assert result == False
     
     def test_rendering_integration(self):

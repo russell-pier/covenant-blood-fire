@@ -298,9 +298,9 @@ class UIComponent(ABC):
 def calculate_layout_areas(
     console_width: int,
     console_height: int,
-    top_bar_height: int = 3,
-    bottom_bar_height: int = 3,
-    sidebar_width: int = 20
+    top_bar_height: int = 0,  # No fixed top bar - floating status
+    bottom_bar_height: int = 0,  # No fixed bottom bar - floating instructions
+    sidebar_width: int = 0  # No sidebars - full screen world view
 ) -> dict:
     """
     Calculate layout areas for UI components.
@@ -315,32 +315,36 @@ def calculate_layout_areas(
     Returns:
         Dictionary with area definitions for each component
     """
-    # Calculate main content area
-    content_y = top_bar_height
-    content_height = console_height - top_bar_height - bottom_bar_height
-    content_x = sidebar_width
-    content_width = console_width - 2 * sidebar_width
-    
+    # Full screen main content area (floating UI overlays on top)
     return {
         'top_bar': {
             'x': 0, 'y': 0,
-            'width': console_width, 'height': top_bar_height
+            'width': 0, 'height': 0  # No fixed top bar
         },
         'bottom_bar': {
-            'x': 0, 'y': console_height - bottom_bar_height,
-            'width': console_width, 'height': bottom_bar_height
+            'x': 0, 'y': 0,
+            'width': 0, 'height': 0  # No fixed bottom bar
         },
         'left_sidebar': {
-            'x': 0, 'y': content_y,
-            'width': sidebar_width, 'height': content_height
+            'x': 0, 'y': 0,
+            'width': 0, 'height': 0  # No left sidebar
         },
         'right_sidebar': {
-            'x': console_width - sidebar_width, 'y': content_y,
-            'width': sidebar_width, 'height': content_height
+            'x': 0, 'y': 0,
+            'width': 0, 'height': 0  # No right sidebar
         },
         'main_content': {
-            'x': content_x, 'y': content_y,
-            'width': content_width, 'height': content_height
+            'x': 0, 'y': 0,
+            'width': console_width, 'height': console_height  # Full screen
+        },
+        # Floating UI areas
+        'status_bar': {
+            'x': 2, 'y': 1,
+            'width': min(80, console_width - 4), 'height': 3
+        },
+        'instructions_panel': {
+            'x': 2, 'y': console_height - 6,
+            'width': min(100, console_width - 4), 'height': 4
         }
     }
 

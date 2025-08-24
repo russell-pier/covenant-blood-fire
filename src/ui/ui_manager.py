@@ -10,19 +10,15 @@ from typing import Optional, Dict, Any
 
 try:
     from .base import UIComponent, calculate_layout_areas
-    from .top_bar import TopBar
-    from .bottom_bar import BottomBar
-    from .left_sidebar import LeftSidebar
-    from .right_sidebar import RightSidebar
+    from .floating_status_bar import FloatingStatusBar
+    from .floating_instructions_panel import FloatingInstructionsPanel
     from ..world_types import ViewScale, ColorRGB
     from ..camera import MultiScaleCameraSystem
     from ..world_data import WorldMapData
 except ImportError:
     from base import UIComponent, calculate_layout_areas
-    from top_bar import TopBar
-    from bottom_bar import BottomBar
-    from left_sidebar import LeftSidebar
-    from right_sidebar import RightSidebar
+    from floating_status_bar import FloatingStatusBar
+    from floating_instructions_panel import FloatingInstructionsPanel
     from world_types import ViewScale, ColorRGB
     from camera import MultiScaleCameraSystem
     from world_data import WorldMapData
@@ -30,23 +26,20 @@ except ImportError:
 
 class UIManager:
     """
-    Manager for all UI components in the world generation system.
-    
+    Manager for floating UI components in the world generation system.
+
     Handles:
-    - Component creation and layout
-    - Rendering coordination
-    - Event distribution
-    - Console area management
-    - Component updates
-    
+    - Floating component creation and positioning
+    - Rendering coordination over full-screen world view
+    - Component updates and responsiveness
+    - Minimal overlay UI design
+
     Attributes:
         console_width: Total console width
         console_height: Total console height
-        top_bar: Top information bar
-        bottom_bar: Bottom control bar
-        left_sidebar: Left sidebar (placeholder)
-        right_sidebar: Right sidebar (placeholder)
-        main_content_area: Area available for main content
+        status_bar: Floating status information bar
+        instructions_panel: Floating instructions panel
+        main_content_area: Full-screen area for world content
         camera_system: Camera system reference
         world_data: World data reference
     """
@@ -75,85 +68,65 @@ class UIManager:
         # Calculate layout areas
         self.layout = calculate_layout_areas(console_width, console_height)
         
-        # Create UI components
+        # Create floating UI components
         self._create_components()
-        
+
         # Component rendering order (back to front)
         self.render_order = [
-            self.left_sidebar,
-            self.right_sidebar,
-            self.top_bar,
-            self.bottom_bar
+            self.status_bar,
+            self.instructions_panel
         ]
         
         # Main content area for game rendering
         self.main_content_area = self.layout['main_content']
     
     def _create_components(self) -> None:
-        """Create all UI components with proper positioning."""
-        # Top bar
-        top_area = self.layout['top_bar']
-        self.top_bar = TopBar(
-            x=top_area['x'],
-            y=top_area['y'],
-            width=top_area['width'],
-            height=top_area['height'],
+        """Create floating UI components with proper positioning."""
+        # Floating status bar
+        status_area = self.layout['status_bar']
+        self.status_bar = FloatingStatusBar(
+            x=status_area['x'],
+            y=status_area['y'],
+            width=status_area['width'],
+            height=status_area['height'],
             camera_system=self.camera_system,
             world_data=self.world_data
         )
-        
-        # Bottom bar
-        bottom_area = self.layout['bottom_bar']
-        self.bottom_bar = BottomBar(
-            x=bottom_area['x'],
-            y=bottom_area['y'],
-            width=bottom_area['width'],
-            height=bottom_area['height']
-        )
-        
-        # Left sidebar
-        left_area = self.layout['left_sidebar']
-        self.left_sidebar = LeftSidebar(
-            x=left_area['x'],
-            y=left_area['y'],
-            width=left_area['width'],
-            height=left_area['height']
-        )
-        
-        # Right sidebar
-        right_area = self.layout['right_sidebar']
-        self.right_sidebar = RightSidebar(
-            x=right_area['x'],
-            y=right_area['y'],
-            width=right_area['width'],
-            height=right_area['height']
+
+        # Floating instructions panel
+        instructions_area = self.layout['instructions_panel']
+        self.instructions_panel = FloatingInstructionsPanel(
+            x=instructions_area['x'],
+            y=instructions_area['y'],
+            width=instructions_area['width'],
+            height=instructions_area['height']
         )
     
     def set_camera_system(self, camera_system: MultiScaleCameraSystem) -> None:
         """
         Set the camera system reference.
-        
+
         Args:
             camera_system: Camera system to use
         """
         self.camera_system = camera_system
-        self.top_bar.set_camera_system(camera_system)
-    
+        self.status_bar.set_camera_system(camera_system)
+
     def set_world_data(self, world_data: WorldMapData) -> None:
         """
         Set the world data reference.
-        
+
         Args:
             world_data: World data to use
         """
         self.world_data = world_data
-        self.top_bar.set_world_data(world_data)
+        self.status_bar.set_world_data(world_data)
     
     def update(self) -> None:
         """Update all UI components with current state."""
         if self.camera_system:
-            # Update bottom bar with current scale
-            self.bottom_bar.set_current_scale(self.camera_system.current_scale)
+            # Update instructions panel with current scale
+            self.instructions_panel.set_current_scale(self.camera_system.current_scale)
     
     def render(self, console: tcod.console.Console) -> None:
         """
@@ -206,22 +179,14 @@ class UIManager:
         # Recalculate layout
         self.layout = calculate_layout_areas(new_width, new_height)
         
-        # Update component positions and sizes
-        top_area = self.layout['top_bar']
-        self.top_bar.set_position(top_area['x'], top_area['y'])
-        self.top_bar.set_size(top_area['width'], top_area['height'])
-        
-        bottom_area = self.layout['bottom_bar']
-        self.bottom_bar.set_position(bottom_area['x'], bottom_area['y'])
-        self.bottom_bar.set_size(bottom_area['width'], bottom_area['height'])
-        
-        left_area = self.layout['left_sidebar']
-        self.left_sidebar.set_position(left_area['x'], left_area['y'])
-        self.left_sidebar.set_size(left_area['width'], left_area['height'])
-        
-        right_area = self.layout['right_sidebar']
-        self.right_sidebar.set_position(right_area['x'], right_area['y'])
-        self.right_sidebar.set_size(right_area['width'], right_area['height'])
+        # Update floating component positions and sizes
+        status_area = self.layout['status_bar']
+        self.status_bar.set_position(status_area['x'], status_area['y'])
+        self.status_bar.set_size(status_area['width'], status_area['height'])
+
+        instructions_area = self.layout['instructions_panel']
+        self.instructions_panel.set_position(instructions_area['x'], instructions_area['y'])
+        self.instructions_panel.set_size(instructions_area['width'], instructions_area['height'])
         
         # Update main content area
         self.main_content_area = self.layout['main_content']
@@ -229,18 +194,16 @@ class UIManager:
     def toggle_component_visibility(self, component_name: str) -> bool:
         """
         Toggle visibility of a UI component.
-        
+
         Args:
-            component_name: Name of component ('top_bar', 'bottom_bar', etc.)
-            
+            component_name: Name of component ('status_bar', 'instructions_panel')
+
         Returns:
             New visibility state
         """
         component_map = {
-            'top_bar': self.top_bar,
-            'bottom_bar': self.bottom_bar,
-            'left_sidebar': self.left_sidebar,
-            'right_sidebar': self.right_sidebar
+            'status_bar': self.status_bar,
+            'instructions_panel': self.instructions_panel
         }
         
         if component_name in component_map:
@@ -271,15 +234,15 @@ class UIManager:
     def get_status_summary(self) -> str:
         """
         Get a summary of current UI status.
-        
+
         Returns:
             String summary of UI state
         """
         visible_components = sum(1 for comp in self.render_order if comp.visible)
         main_area = self.main_content_area
-        
-        return (f"UI: {visible_components}/4 components visible, "
-                f"main area: {main_area['width']}x{main_area['height']}")
+
+        return (f"UI: {visible_components}/2 floating components, "
+                f"full screen: {main_area['width']}x{main_area['height']}")
 
 
 if __name__ == "__main__":
