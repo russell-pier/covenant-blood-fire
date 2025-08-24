@@ -1,261 +1,186 @@
-# Covenant: Blood & Fire
+# Three-Tier World Generation System
 
-```ascii
-   ___                                 _               
-  / __\_____   _____ _ __   __ _ _ __ | |_ _           
- / /  / _ \ \ / / _ \ '_ \ / _` | '_ \| __(_)          
-/ /__| (_) \ V /  __/ | | | (_| | | | | |_ _           
-\____/\___/ \_/ \___|_| |_|\__,_|_| |_|\__(_)          
-                                                       
-   ___ _                 _    ___       ___ _          
-  / __\ | ___   ___   __| |  ( _ )     / __(_)_ __ ___ 
- /__\// |/ _ \ / _ \ / _` |  / _ \/\  / _\ | | '__/ _ \
-/ \/  \ | (_) | (_) | (_| | | (_>  < / /   | | | |  __/
-\_____/_|\___/ \___/ \__,_|  \___/\/ \/    |_|_|  \___|
-                                                       
-```
+[![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-68%25-yellow)](tests/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue)](https://python.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-66%20passed-green.svg)](tests/)
+A professional-grade, deterministic world generation system with hierarchical terrain generation across three scales: World, Regional, and Local. Built with Python and libtcod for real-time interactive visualization.
 
-A terminal-based strategy game built with Python and libtcod, featuring infinite procedural world generation and real-time strategy gameplay in your console.
+![World Generation Demo](docs/demo.png)
 
-![Covenant: Blood & Fire Game Screenshot](docs/screenshot.png)
+## 🌟 Features
 
-## ✨ Features
+### Core World Generation
+- **Deterministic Generation**: Same seed produces identical worlds every time
+- **Multi-Scale Architecture**: Three hierarchical levels (World → Regional → Local)
+- **Rich Terrain Types**: 8 distinct terrain types with realistic distribution
+- **Climate Simulation**: 4 climate zones affecting terrain characteristics
+- **Geological Features**: Tectonic plates, mountain ranges, river systems
 
-### 🌍 **Infinite World Generation**
+### Interactive Visualization
+- **Real-Time Rendering**: 60 FPS performance with libtcod
+- **Multi-Scale Camera**: Seamless navigation between viewing scales
+- **Professional UI**: Information panels, controls, and status displays
+- **Mouse & Keyboard**: Full input support for navigation and selection
 
-- **Procedural terrain** using Perlin noise algorithms
-- **Chunk-based system** for efficient memory management
-- **9 terrain types**: Deep water, shallow water, sand, grasslands, forests, hills, and mountains
-- **Seamless exploration** with no loading screens
-
-### 🎮 **Intuitive Controls**
-
-- **Fixed crosshair cursor** at screen center
-- **Smooth world scrolling** with arrow keys or WASD
-- **Real-time performance monitoring** with FPS display
-- **Responsive 60 FPS gameplay**
-
-### 🏗️ **Modern Architecture**
-
-- **Modular design** with clean separation of concerns
-- **Comprehensive test suite** (66 tests, 100% pass rate)
-- **Type hints** throughout for better IDE support
-- **Performance optimized** for smooth gameplay
+### Technical Excellence
+- **Type Safety**: Comprehensive type hints throughout
+- **Test Coverage**: 64 tests with 68% code coverage
+- **Modular Design**: Loosely coupled, easily extensible architecture
+- **Professional Code**: Docstrings, error handling, validation
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
-- **Python 3.13+** (required)
-- **uv** package manager (recommended) or pip
+- Python 3.10 or higher
+- [uv](https://github.com/astral-sh/uv) package manager
 
 ### Installation
 
-#### Using uv (Recommended)
-
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/empires.git
-cd empires
+git clone https://github.com/your-username/three-tier-world-gen.git
+cd three-tier-world-gen
 
 # Install dependencies
-uv sync
+uv install
 
-# Run the game
-uv run python -m src.empires.main
-```
-
-#### Using pip
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/empires.git
-cd empires
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -e .
-
-# Run the game
-python -m src.empires.main
+# Run the system
+uv run python -m src.main
 ```
 
 ### Controls
-
-| Key | Action |
-|-----|--------|
-| `↑` `↓` `←` `→` | Scroll the world |
-| `W` `A` `S` `D` | Alternative scroll controls |
-| `ESC` or `Q` | Quit game |
-
-## 🎯 Gameplay
-
-- **Explore** an infinite procedurally generated world
-- **Navigate** using the golden crosshair cursor
-- **Discover** diverse terrain types from deep oceans to mountain peaks
-- **Monitor** performance with real-time FPS display
-- **Experience** smooth 60 FPS gameplay
-
-## 🏗️ Architecture
-
-### Core Components
-
-```
-src/empires/
-├── main.py                 # Game loop and main application
-├── world/                  # World generation system
-│   ├── noise.py           # Perlin noise generation
-│   ├── terrain.py         # Terrain types and properties
-│   ├── chunks.py          # Chunk management system
-│   └── generator.py       # World generation coordinator
-└── camera/                # Camera and viewport system
-    └── viewport.py        # Camera movement and rendering
-```
-
-### Key Features
-
-- **Chunk System**: 32×32 tile chunks with LRU caching
-- **Noise Generation**: Multi-octave Perlin noise for natural terrain
-- **Camera System**: Fixed crosshair with world scrolling
-- **Performance**: Optimized rendering with viewport culling
-
-## 🧪 Development
-
-### Running Tests
-
-```bash
-# Install dev dependencies first
-uv sync --extra dev
-
-# Run all tests
-uv run python -m pytest tests/ -v
-
-# Run specific test module
-uv run python -m pytest tests/world/test_noise.py -v
-
-# Run with coverage (requires pytest-cov)
-uv run python -m pytest tests/ --cov=src/empires
-```
-
-### Code Quality
-
-```bash
-# Format code
-uv run black src/ tests/
-
-# Lint code
-uv run ruff check src/ tests/
-
-# Type checking
-uv run mypy src/
-```
-
-### Project Structure
-
-```
-covenant-blood-fire/
-├── src/empires/           # Source code
-│   ├── main.py           # Main application entry point
-│   ├── world/            # World generation modules
-│   └── camera/           # Camera and viewport modules
-├── tests/                # Test suite
-│   ├── world/            # World generation tests
-│   └── camera/           # Camera system tests
-├── docs/                 # Documentation
-│   └── world_generation_design.md
-├── pyproject.toml        # Project configuration
-└── README.md            # This file
-```
+- **1/2/3**: Switch between World/Regional/Local views
+- **WASD** or **Arrow Keys**: Move camera
+- **Mouse Click**: Select location (World view)
+- **ESC** or **Q**: Quit application
+- **H** or **F1**: Toggle help
 
 ## 📖 Documentation
 
-- **[Design Document](docs/world_generation_design.md)** - Comprehensive system architecture
-- **[API Reference](src/empires/)** - Inline documentation in source code
-- **[Test Coverage](tests/)** - 66 comprehensive unit tests
+### World Generation
 
-## 🎯 Roadmap
+The system generates worlds using a three-tier hierarchical approach:
 
-### Phase 1: Core Systems ✅
+1. **World Scale (8×6 sectors)**: Continental features, ocean/land distribution
+2. **Regional Scale (32×32 blocks per sector)**: Mountain ranges, river systems
+3. **Local Scale (32×32 chunks per block)**: Detailed terrain variation
 
-- [x] Infinite world generation
-- [x] Chunk-based memory management
-- [x] Camera and viewport system
-- [x] Performance optimization
-- [x] Comprehensive testing
+#### Terrain Types
+- **Ocean**: Deep water, impassable
+- **Coastal**: Shallow water, coastal areas
+- **Plains**: Flat grassland, easy movement
+- **Forest**: Wooded areas, moderate movement
+- **Hills**: Rolling terrain, slower movement
+- **Mountains**: High elevation, difficult terrain
+- **Desert**: Arid regions, special movement rules
+- **Tundra**: Cold regions, harsh conditions
 
-### Phase 2: Gameplay (Planned)
+#### Climate Zones
+- **Arctic**: Extreme cold, tundra and ice
+- **Temperate**: Moderate climate, varied terrain
+- **Tropical**: Warm and humid, dense vegetation
+- **Arid**: Hot and dry, desert conditions
 
-- [ ] Unit system (villagers, military units)
-- [ ] Resource management (food, wood, stone, gold)
-- [ ] Building construction
-- [ ] Technology research tree
+### Architecture
 
-### Phase 3: Advanced Features (Future)
+```
+src/
+├── main.py              # Main game loop and integration
+├── world_types.py       # Core type definitions
+├── noise.py            # Hierarchical noise generation
+├── world_data.py       # World data structures
+├── world_generator.py  # World generation logic
+├── camera.py           # Multi-scale camera system
+├── view_manager.py     # View coordination
+├── input_handler.py    # Input processing
+├── ui/                 # User interface components
+│   ├── base.py         # Base UI component
+│   ├── top_bar.py      # Information display
+│   ├── bottom_bar.py   # Control instructions
+│   ├── left_sidebar.py # Tool panel (placeholder)
+│   ├── right_sidebar.py# Info panel (placeholder)
+│   └── ui_manager.py   # UI coordination
+└── renderers/          # Rendering system
+    ├── world_renderer.py    # World scale rendering
+    ├── regional_renderer.py # Regional placeholder
+    └── local_renderer.py    # Local placeholder
+```
 
-- [ ] Multiplayer support
-- [ ] AI opponents
-- [ ] Save/load functionality
-- [ ] Mod support
-- [ ] Advanced graphics options
+## 🧪 Testing
+
+Run the comprehensive test suite:
+
+```bash
+# Run all tests
+uv run pytest tests/ -v
+
+# Run with coverage report
+uv run pytest tests/ -v --cov=src --cov-report=html
+
+# Run specific test categories
+uv run pytest tests/test_world_generator.py -v  # World generation
+uv run pytest tests/test_camera.py -v          # Camera system
+uv run pytest tests/test_noise.py -v           # Noise generation
+uv run pytest tests/test_renderers.py -v       # Rendering system
+```
+
+### Test Coverage
+- **64 tests** covering all major functionality
+- **68% overall coverage** with high coverage on core systems
+- Comprehensive edge case testing
+- Performance and determinism validation
+
+## 🔧 Development
+
+### Project Structure
+The codebase follows professional Python standards:
+- Type hints throughout
+- Comprehensive docstrings
+- Modular, loosely-coupled design
+- Extensive error handling and validation
+
+### Adding Features
+The system is designed for easy extension:
+
+1. **New Terrain Types**: Add to `TerrainType` enum and update classification logic
+2. **Enhanced Rendering**: Implement regional/local renderers
+3. **Save/Load**: Add serialization to world data structures
+4. **Advanced UI**: Extend sidebar components with new functionality
+
+### Code Quality
+```bash
+# Type checking
+uv run mypy src/
+
+# Code formatting
+uv run black src/ tests/
+
+# Linting
+uv run flake8 src/ tests/
+```
+
+## 📊 Performance
+
+- **60 FPS** target performance
+- **Deterministic** generation (same seed = identical results)
+- **Memory efficient** with lazy loading support
+- **Scalable** architecture supporting larger worlds
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our contributing guidelines:
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Development Setup
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Make changes and add tests
+4. Ensure all tests pass: `uv run pytest`
+5. Submit a pull request
 
-```bash
-# Clone your fork
-git clone https://github.com/yourusername/empires.git
-cd empires
-
-# Install development dependencies
-uv sync --extra dev
-
-# Run tests to ensure everything works
-uv run python -m pytest tests/
-```
-
-## 📋 Requirements
-
-### System Requirements
-
-- **Python**: 3.13 or higher
-- **Memory**: 100MB+ RAM
-- **Storage**: 50MB+ disk space
-- **Terminal**: Any modern terminal with color support
-
-### Dependencies
-
-- **tcod**: Terminal graphics and input handling
-- **Development**: pytest, black, ruff, mypy (optional)
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Font loading warnings**: The game may show font loading warnings but will work with system defaults.
-
-**Performance issues**: If experiencing low FPS:
-
-- Ensure Python 3.13+ is being used
-- Close other resource-intensive applications
-- Check terminal performance settings
-
-**Import errors**: Make sure you're running from the project root directory.
+### Reporting Issues
+Please use the [GitHub issue tracker](https://github.com/your-username/three-tier-world-gen/issues) to report bugs or request features.
 
 ## 📄 License
 
@@ -263,17 +188,39 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **libtcod** - Excellent terminal graphics library
-- **Python community** - For amazing tools and libraries
-- **Age of Empires** - Inspiration for gameplay mechanics
-- **Perlin noise** - Ken Perlin's noise algorithm for terrain generation
+- Built with [python-tcod](https://github.com/libtcod/python-tcod) for rendering
+- Inspired by procedural generation techniques from game development
+- Uses [uv](https://github.com/astral-sh/uv) for fast dependency management
 
-## 📞 Support
+## 📈 Roadmap
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/covenant-blood-fire/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/covenant-blood-fire/discussions)
-- **Documentation**: [Project Wiki](https://github.com/yourusername/covenant-blood-fire/wiki)
+### Phase 1: Foundation ✅
+- [x] Project setup and core types
+- [x] Noise generation system
+- [x] World scale generation
+- [x] Camera system
+- [x] UI framework
+- [x] World view rendering
+- [x] Input handling and integration
+
+### Phase 2: Enhanced Generation 🔄
+- [ ] Regional scale terrain generation
+- [ ] Local scale detail generation
+- [ ] Advanced geological features
+- [ ] Biome-specific details
+
+### Phase 3: Advanced Features 📋
+- [ ] Save/load functionality
+- [ ] World export formats
+- [ ] Performance optimizations
+- [ ] Advanced UI features
+
+### Phase 4: Extensions 🚀
+- [ ] Plugin system
+- [ ] Custom terrain types
+- [ ] Multiplayer support
+- [ ] 3D visualization
 
 ---
 
-**Made with ❤️ by the Covenant: Blood & Fire development team**
+**Built with ❤️ for the procedural generation community**

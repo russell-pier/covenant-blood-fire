@@ -1,1 +1,3 @@
-"""Test package for the Empires game."""
+"""
+Test suite for the three-tier world generation system.
+"""
