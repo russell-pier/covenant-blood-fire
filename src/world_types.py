@@ -197,9 +197,9 @@ NoiseValue = float
 Frequency = float
 Octaves = int
 
-# Scale conversion constants
-WORLD_SECTORS_X = 8
-WORLD_SECTORS_Y = 6
+# Scale conversion constants - Expanded world size for proper scrolling
+WORLD_SECTORS_X = 64  # Much larger world for scrolling
+WORLD_SECTORS_Y = 48
 REGIONAL_BLOCKS_SIZE = 32
 LOCAL_CHUNKS_SIZE = 32
 SECTOR_PIXEL_SIZE = 16  # 16x16 pixels per sector in world view

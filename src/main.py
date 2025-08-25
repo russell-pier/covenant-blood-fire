@@ -131,13 +131,34 @@ class Game:
 
     def run(self) -> None:
         """Main game loop."""
-        # Create context that supports window resizing
-        context = tcod.context.new(
-            columns=self.screen_width,
-            rows=self.screen_height,
-            title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
-            vsync=True,
-        )
+        # Create context that supports window resizing with 16pt font
+        try:
+            # Try to create context with 16pt font
+            context = tcod.context.new(
+                columns=self.screen_width,
+                rows=self.screen_height,
+                title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
+                vsync=True,
+                tileset=tcod.tileset.load_truetype_font("DejaVuSansMono.ttf", 16, 16)
+            )
+        except:
+            # Fallback to default font if 16pt font fails
+            try:
+                context = tcod.context.new(
+                    columns=self.screen_width,
+                    rows=self.screen_height,
+                    title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
+                    vsync=True,
+                    tileset=tcod.tileset.load_truetype_font("arial.ttf", 16, 16)
+                )
+            except:
+                # Final fallback to built-in font
+                context = tcod.context.new(
+                    columns=self.screen_width,
+                    rows=self.screen_height,
+                    title="Three-Tier World Generation System - Responsive Grid (Resize window to expand grid!)",
+                    vsync=True,
+                )
 
         try:
             print("✓ Game window created successfully")

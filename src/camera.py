@@ -25,10 +25,10 @@ except ImportError:
 class Camera:
     """
     Basic camera class for position tracking and movement.
-    
+
     Handles camera position, movement with bounds checking, and
     coordinate conversion utilities for a single viewing scale.
-    
+
     Attributes:
         position: Current camera position
         bounds_width: Maximum width for bounds checking
@@ -201,6 +201,140 @@ class Camera:
         return top_left, width, height
 
 
+class CenteredCursorCamera(Camera):
+    """
+    Camera with centered cursor that scrolls the world instead of moving cursor.
+
+    The cursor stays in the center of the screen. When movement is requested:
+    - If there's more world to see in that direction, the world scrolls
+    - If at world boundary, the cursor can move from center
+
+    Attributes:
+        cursor_position: Current cursor position in world coordinates
+        world_width: Total world width
+        world_height: Total world height
+        screen_center_x: X coordinate of screen center
+        screen_center_y: Y coordinate of screen center
+    """
+
+    def __init__(
+        self,
+        initial_cursor_position: Coordinate = Coordinate(32, 24),  # Center of larger world
+        world_width: int = WORLD_SECTORS_X,
+        world_height: int = WORLD_SECTORS_Y,
+        view_width: int = WORLD_VIEW_WIDTH,
+        view_height: int = WORLD_VIEW_HEIGHT
+    ) -> None:
+        """
+        Initialize centered cursor camera.
+
+        Args:
+            initial_cursor_position: Starting cursor position in world
+            world_width: Total world width
+            world_height: Total world height
+            view_width: Screen view width
+            view_height: Screen view height
+        """
+        # Initialize base camera
+        super().__init__(
+            initial_position=Coordinate(0, 0),
+            bounds_width=world_width,
+            bounds_height=world_height,
+            view_width=view_width,
+            view_height=view_height
+        )
+
+        self.cursor_position = initial_cursor_position
+        self.world_width = world_width
+        self.world_height = world_height
+        self.screen_center_x = view_width // 2
+        self.screen_center_y = view_height // 2
+
+        # Calculate initial camera position to center cursor
+        self._update_camera_to_center_cursor()
+
+    def _update_camera_to_center_cursor(self) -> None:
+        """Update camera position to keep cursor centered when possible."""
+        # Calculate desired camera position to center the cursor
+        desired_cam_x = self.cursor_position.x - self.screen_center_x
+        desired_cam_y = self.cursor_position.y - self.screen_center_y
+
+        # Clamp camera to world bounds
+        max_cam_x = self.world_width - self.view_width
+        max_cam_y = self.world_height - self.view_height
+
+        actual_cam_x = max(0, min(desired_cam_x, max_cam_x))
+        actual_cam_y = max(0, min(desired_cam_y, max_cam_y))
+
+        self.position = Coordinate(actual_cam_x, actual_cam_y)
+
+    def move_cursor(self, dx: int, dy: int) -> bool:
+        """
+        Move cursor with centered scrolling behavior.
+
+        Args:
+            dx: Horizontal movement
+            dy: Vertical movement
+
+        Returns:
+            True if movement occurred
+        """
+        # Calculate new cursor position
+        new_cursor_x = self.cursor_position.x + dx
+        new_cursor_y = self.cursor_position.y + dy
+
+        # Check world bounds
+        if (new_cursor_x < 0 or new_cursor_x >= self.world_width or
+            new_cursor_y < 0 or new_cursor_y >= self.world_height):
+            return False
+
+        # Update cursor position
+        self.cursor_position = Coordinate(new_cursor_x, new_cursor_y)
+
+        # Update camera to keep cursor centered
+        self._update_camera_to_center_cursor()
+
+        return True
+
+    def get_cursor_screen_position(self) -> Coordinate:
+        """
+        Get cursor position on screen.
+
+        Returns:
+            Screen coordinates of cursor
+        """
+        screen_x = self.cursor_position.x - self.position.x
+        screen_y = self.cursor_position.y - self.position.y
+        return Coordinate(screen_x, screen_y)
+
+    def get_cursor_world_position(self) -> Coordinate:
+        """
+        Get cursor position in world coordinates.
+
+        Returns:
+            World coordinates of cursor
+        """
+        return self.cursor_position
+
+    def set_cursor_position(self, world_position: Coordinate) -> bool:
+        """
+        Set cursor to specific world position.
+
+        Args:
+            world_position: Target world position
+
+        Returns:
+            True if position is valid
+        """
+        if (world_position.x < 0 or world_position.x >= self.world_width or
+            world_position.y < 0 or world_position.y >= self.world_height):
+            return False
+
+        self.cursor_position = world_position
+        self._update_camera_to_center_cursor()
+        return True
+
+
 class MultiScaleCameraSystem:
     """
     Multi-scale camera system managing three independent cameras.
@@ -218,30 +352,30 @@ class MultiScaleCameraSystem:
     """
     
     def __init__(self) -> None:
-        """Initialize the multi-scale camera system."""
-        # World camera (8x6 sectors)
-        self.world_camera = Camera(
-            initial_position=Coordinate(WORLD_SECTORS_X // 2, WORLD_SECTORS_Y // 2),
-            bounds_width=WORLD_SECTORS_X,
-            bounds_height=WORLD_SECTORS_Y,
+        """Initialize the multi-scale camera system with centered cursors."""
+        # World camera with centered cursor (64x48 sectors)
+        self.world_camera = CenteredCursorCamera(
+            initial_cursor_position=Coordinate(WORLD_SECTORS_X // 2, WORLD_SECTORS_Y // 2),
+            world_width=WORLD_SECTORS_X,
+            world_height=WORLD_SECTORS_Y,
             view_width=WORLD_VIEW_WIDTH,
             view_height=WORLD_VIEW_HEIGHT
         )
-        
-        # Regional camera (32x32 blocks within a sector)
-        self.regional_camera = Camera(
-            initial_position=Coordinate(REGIONAL_BLOCKS_SIZE // 2, REGIONAL_BLOCKS_SIZE // 2),
-            bounds_width=REGIONAL_BLOCKS_SIZE,
-            bounds_height=REGIONAL_BLOCKS_SIZE,
+
+        # Regional camera with centered cursor (32x32 blocks within a sector)
+        self.regional_camera = CenteredCursorCamera(
+            initial_cursor_position=Coordinate(REGIONAL_BLOCKS_SIZE // 2, REGIONAL_BLOCKS_SIZE // 2),
+            world_width=REGIONAL_BLOCKS_SIZE,
+            world_height=REGIONAL_BLOCKS_SIZE,
             view_width=WORLD_VIEW_WIDTH,
             view_height=WORLD_VIEW_HEIGHT
         )
-        
-        # Local camera (32x32 chunks within a block)
-        self.local_camera = Camera(
-            initial_position=Coordinate(LOCAL_CHUNKS_SIZE // 2, LOCAL_CHUNKS_SIZE // 2),
-            bounds_width=LOCAL_CHUNKS_SIZE,
-            bounds_height=LOCAL_CHUNKS_SIZE,
+
+        # Local camera with centered cursor (32x32 chunks within a block)
+        self.local_camera = CenteredCursorCamera(
+            initial_cursor_position=Coordinate(LOCAL_CHUNKS_SIZE // 2, LOCAL_CHUNKS_SIZE // 2),
+            world_width=LOCAL_CHUNKS_SIZE,
+            world_height=LOCAL_CHUNKS_SIZE,
             view_width=WORLD_VIEW_WIDTH,
             view_height=WORLD_VIEW_HEIGHT
         )
@@ -302,8 +436,26 @@ class MultiScaleCameraSystem:
         Returns:
             True if movement was successful
         """
-        return self.get_current_camera().move(dx, dy)
-    
+        return self.get_current_camera().move_cursor(dx, dy)
+
+    def get_current_cursor_position(self) -> Coordinate:
+        """
+        Get current cursor position in world coordinates.
+
+        Returns:
+            Cursor position for current scale
+        """
+        return self.get_current_camera().get_cursor_world_position()
+
+    def get_current_cursor_screen_position(self) -> Coordinate:
+        """
+        Get current cursor position on screen.
+
+        Returns:
+            Screen coordinates of cursor
+        """
+        return self.get_current_camera().get_cursor_screen_position()
+
     def get_current_position_info(self) -> dict:
         """
         Get detailed position information for current scale.
@@ -313,19 +465,24 @@ class MultiScaleCameraSystem:
         """
         current_camera = self.get_current_camera()
         
+        cursor_pos = current_camera.get_cursor_world_position()
+        screen_pos = current_camera.get_cursor_screen_position()
+
         info = {
             'scale': self.current_scale.name,
             'camera_position': current_camera.position,
+            'cursor_position': cursor_pos,
+            'cursor_screen_position': screen_pos,
             'selected_sector': self.selected_sector,
             'selected_block': self.selected_block
         }
         
         if self.current_scale == ViewScale.WORLD:
-            info['description'] = f"World View - Sector ({current_camera.position.x}, {current_camera.position.y})"
+            info['description'] = f"World View - Cursor at Sector ({cursor_pos.x}, {cursor_pos.y})"
         elif self.current_scale == ViewScale.REGIONAL:
-            info['description'] = f"Regional View - Sector {self.selected_sector}, Block ({current_camera.position.x}, {current_camera.position.y})"
+            info['description'] = f"Regional View - Cursor at Block ({cursor_pos.x}, {cursor_pos.y})"
         else:  # LOCAL
-            info['description'] = f"Local View - Block {self.selected_block}, Chunk ({current_camera.position.x}, {current_camera.position.y})"
+            info['description'] = f"Local View - Cursor at Chunk ({cursor_pos.x}, {cursor_pos.y})"
         
         return info
     

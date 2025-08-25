@@ -82,30 +82,29 @@ class WorldRenderer:
     
     def calculate_sector_screen_position(self, sector_x: int, sector_y: int) -> Tuple[int, int]:
         """
-        Calculate screen position for a world sector.
-        
+        Calculate screen position for a world sector based on camera position.
+
         Args:
-            sector_x: Sector X coordinate (0-7)
-            sector_y: Sector Y coordinate (0-5)
-            
+            sector_x: Sector X coordinate
+            sector_y: Sector Y coordinate
+
         Returns:
             Tuple of (screen_x, screen_y) for top-left of sector
         """
-        if not self.render_area:
+        if not self.render_area or not self.camera_system:
             return (0, 0)
-        
-        # Calculate total world display size
-        world_display_width = WORLD_SECTORS_X * SECTOR_PIXEL_SIZE
-        world_display_height = WORLD_SECTORS_Y * SECTOR_PIXEL_SIZE
-        
-        # Center the world display in the render area
-        offset_x = (self.render_area['width'] - world_display_width) // 2
-        offset_y = (self.render_area['height'] - world_display_height) // 2
-        
-        # Calculate sector position
-        screen_x = self.render_area['x'] + offset_x + (sector_x * SECTOR_PIXEL_SIZE)
-        screen_y = self.render_area['y'] + offset_y + (sector_y * SECTOR_PIXEL_SIZE)
-        
+
+        # Get camera position (this is the top-left of the view)
+        camera_pos = self.camera_system.world_camera.position
+
+        # Calculate sector position relative to camera
+        relative_x = sector_x - camera_pos.x
+        relative_y = sector_y - camera_pos.y
+
+        # Convert to screen coordinates
+        screen_x = self.render_area['x'] + (relative_x * SECTOR_PIXEL_SIZE)
+        screen_y = self.render_area['y'] + (relative_y * SECTOR_PIXEL_SIZE)
+
         return screen_x, screen_y
     
     def render_sector(
@@ -224,30 +223,52 @@ class WorldRenderer:
             camera_pos = self.camera_system.world_camera.position
             selected_sector = WorldCoordinate(camera_pos.x, camera_pos.y)
         
-        # Render all sectors
-        for y in range(WORLD_SECTORS_Y):
-            for x in range(WORLD_SECTORS_X):
-                sector = self.world_data.sectors[y][x]
-                screen_x, screen_y = self.calculate_sector_screen_position(x, y)
-                
-                # Check if this sector is selected
-                is_selected = (selected_sector and 
-                              selected_sector.x == x and 
-                              selected_sector.y == y)
-                
-                self.render_sector(console, sector, screen_x, screen_y, is_selected)
-        
-        # Render camera crosshair if in world view
-        if (self.camera_system and 
-            self.camera_system.current_scale == ViewScale.WORLD):
+        # Calculate visible sector range based on camera and render area
+        if self.camera_system:
             camera_pos = self.camera_system.world_camera.position
+
+            # Calculate how many sectors fit in the render area
+            sectors_per_screen_x = (self.render_area['width'] // SECTOR_PIXEL_SIZE) + 2  # +2 for partial sectors
+            sectors_per_screen_y = (self.render_area['height'] // SECTOR_PIXEL_SIZE) + 2
+
+            # Calculate visible range
+            start_x = max(0, camera_pos.x)
+            end_x = min(WORLD_SECTORS_X, camera_pos.x + sectors_per_screen_x)
+            start_y = max(0, camera_pos.y)
+            end_y = min(WORLD_SECTORS_Y, camera_pos.y + sectors_per_screen_y)
+
+            # Render only visible sectors
+            for y in range(start_y, end_y):
+                for x in range(start_x, end_x):
+                    if (y < len(self.world_data.sectors) and
+                        x < len(self.world_data.sectors[y])):
+                        sector = self.world_data.sectors[y][x]
+                        screen_x, screen_y = self.calculate_sector_screen_position(x, y)
+
+                        # Only render if on screen
+                        if (screen_x >= self.render_area['x'] - SECTOR_PIXEL_SIZE and
+                            screen_x < self.render_area['x'] + self.render_area['width'] and
+                            screen_y >= self.render_area['y'] - SECTOR_PIXEL_SIZE and
+                            screen_y < self.render_area['y'] + self.render_area['height']):
+
+                            # Check if this sector is selected
+                            is_selected = (selected_sector and
+                                          selected_sector.x == x and
+                                          selected_sector.y == y)
+
+                            self.render_sector(console, sector, screen_x, screen_y, is_selected)
+        
+        # Render cursor crosshair if in world view
+        if (self.camera_system and
+            self.camera_system.current_scale == ViewScale.WORLD):
+            cursor_pos = self.camera_system.world_camera.get_cursor_world_position()
             crosshair_x, crosshair_y = self.calculate_sector_screen_position(
-                camera_pos.x, camera_pos.y
+                cursor_pos.x, cursor_pos.y
             )
             # Center crosshair in sector
             crosshair_x += SECTOR_PIXEL_SIZE // 2
             crosshair_y += SECTOR_PIXEL_SIZE // 2
-            
+
             self.render_crosshair(console, crosshair_x, crosshair_y)
     
     def render_placeholder(self, console: tcod.console.Console) -> None:
@@ -294,37 +315,41 @@ class WorldRenderer:
     
     def get_sector_at_screen_position(self, screen_x: int, screen_y: int) -> Optional[WorldCoordinate]:
         """
-        Get world sector at screen position.
-        
+        Get world sector at screen position based on camera position.
+
         Args:
             screen_x: Screen X coordinate
             screen_y: Screen Y coordinate
-            
+
         Returns:
             World coordinate if valid, None otherwise
         """
-        if not self.render_area:
+        if not self.render_area or not self.camera_system:
             return None
-        
-        # Calculate world display offset
-        world_display_width = WORLD_SECTORS_X * SECTOR_PIXEL_SIZE
-        world_display_height = WORLD_SECTORS_Y * SECTOR_PIXEL_SIZE
-        offset_x = (self.render_area['width'] - world_display_width) // 2
-        offset_y = (self.render_area['height'] - world_display_height) // 2
-        
-        # Convert to world coordinates
-        world_x = screen_x - self.render_area['x'] - offset_x
-        world_y = screen_y - self.render_area['y'] - offset_y
-        
-        # Calculate sector coordinates
-        sector_x = world_x // SECTOR_PIXEL_SIZE
-        sector_y = world_y // SECTOR_PIXEL_SIZE
-        
+
+        # Check if click is within render area
+        if (screen_x < self.render_area['x'] or
+            screen_x >= self.render_area['x'] + self.render_area['width'] or
+            screen_y < self.render_area['y'] or
+            screen_y >= self.render_area['y'] + self.render_area['height']):
+            return None
+
+        # Get camera position
+        camera_pos = self.camera_system.world_camera.position
+
+        # Convert screen position to relative position within render area
+        relative_x = screen_x - self.render_area['x']
+        relative_y = screen_y - self.render_area['y']
+
+        # Calculate sector coordinates based on camera position
+        sector_x = camera_pos.x + (relative_x // SECTOR_PIXEL_SIZE)
+        sector_y = camera_pos.y + (relative_y // SECTOR_PIXEL_SIZE)
+
         # Validate bounds
-        if (0 <= sector_x < WORLD_SECTORS_X and 
+        if (0 <= sector_x < WORLD_SECTORS_X and
             0 <= sector_y < WORLD_SECTORS_Y):
             return WorldCoordinate(sector_x, sector_y)
-        
+
         return None
 
 
