@@ -679,18 +679,19 @@ class Game:
 
     def run(self) -> None:
         """Main game loop."""
-        # Load a larger, proportional font for better readability
+        # Use tcod's built-in larger font for better readability
         try:
-            # Try to load a proportional font with larger size
-            font_path = "data/fonts/arial12x12_gs_tc.png"  # Fallback to built-in if not found
-            tileset = tcod.tileset.load_tilesheet(
-                font_path, 32, 8, tcod.tileset.CHARMAP_TCOD
-            )
+            # Load a larger built-in font (16x16 is good for readability)
+            tileset = tcod.tileset.load_truetype_font("DejaVuSansMono.ttf", 16, 16)
         except:
-            # Fallback to default font but with larger size
-            tileset = tcod.tileset.load_tilesheet(
-                "data/fonts/dejavu16x16_gs_tc.png", 32, 8, tcod.tileset.CHARMAP_TCOD
-            )
+            try:
+                # Fallback to built-in bitmap font
+                tileset = tcod.tileset.load_tilesheet(
+                    tcod.tileset.FONT_FILE, 16, 16, tcod.tileset.CHARMAP_CP437
+                )
+            except:
+                # Final fallback - use default
+                tileset = None
 
         # Create context with improved font
         context = tcod.context.new(
