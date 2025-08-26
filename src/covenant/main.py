@@ -289,9 +289,9 @@ class Game:
         current_scale = self.camera.get_current_scale()
 
         if current_scale == ViewScale.WORLD:
-            # Drilling down from world to regional - use current cursor world coordinates
-            cursor_world_x, cursor_world_y = self._get_cursor_world_coordinates()
-            self.current_world_sector = (int(cursor_world_x), int(cursor_world_y))
+            # Drilling down from world to regional - use camera position as cursor
+            camera = self.camera.camera_positions[ViewScale.WORLD]
+            self.current_world_sector = (int(camera.x), int(camera.y))
 
             # Center regional camera and reset cursor offsets
             self.camera.transition_to_scale(ViewScale.REGIONAL)
@@ -339,62 +339,55 @@ class Game:
         self._update_context_for_scale_change()
 
     def _handle_movement(self, dx: int, dy: int):
-        """Handle unified movement with center-fixed cursor and edge behavior."""
+        """Handle movement with cursor fixed in center except at map boundaries."""
         current_scale = self.camera.get_current_scale()
-        camera = self.camera.get_current_camera_position()
 
-        # Get map bounds for current scale
         if current_scale == ViewScale.WORLD:
-            map_width, map_height = len(self.world_map[0]), len(self.world_map)
-        elif current_scale == ViewScale.REGIONAL:
-            if self.current_regional_map:
-                map_width, map_height = len(self.current_regional_map[0]), len(self.current_regional_map)
-            else:
-                map_width, map_height = 32, 32  # Default regional size
-        else:  # LOCAL
-            if self.current_local_map:
-                map_width, map_height = len(self.current_local_map[0]), len(self.current_local_map)
-            else:
-                map_width, map_height = 32, 32  # Default local size
+            self._handle_world_movement(dx, dy)
+        else:
+            # Regional and Local use the old system for now
+            self.camera.move_camera(dx, dy)
 
-        # Calculate viewport bounds
+    def _handle_world_movement(self, dx: int, dy: int):
+        """Handle world map movement with fixed center cursor except at edges."""
+        camera = self.camera.camera_positions[ViewScale.WORLD]
         viewport = self.camera.get_viewport_info()
-        half_width = viewport.viewport_width // 2
-        half_height = viewport.viewport_height // 2
 
-        # Calculate desired new camera position
-        new_camera_x = camera.target_x + dx
-        new_camera_y = camera.target_y + dy
+        # World map bounds
+        world_width, world_height = 128, 96
 
-        # Check if camera can move (not at map edges)
-        can_move_x = (new_camera_x - half_width >= 0 and new_camera_x + half_width < map_width)
-        can_move_y = (new_camera_y - half_height >= 0 and new_camera_y + half_height < map_height)
+        # Calculate viewport size
+        visible_width = min(viewport.viewport_width, world_width)
+        visible_height = min(viewport.viewport_height, world_height)
+        half_width = visible_width // 2
+        half_height = visible_height // 2
 
-        # Handle movement and cursor positioning
-        if can_move_x and dx != 0:
-            # Camera can move horizontally - keep cursor centered
-            camera.target_x = new_camera_x
-            self.cursor_offset_x = 0
-        elif dx != 0:
-            # Camera at horizontal edge - move cursor instead
-            new_offset_x = self.cursor_offset_x + dx
-            # Limit cursor movement to viewport bounds
-            max_offset = half_width - 1
-            self.cursor_offset_x = max(-max_offset, min(max_offset, new_offset_x))
+        # Calculate new camera position
+        new_x = camera.x + dx
+        new_y = camera.y + dy
 
-        if can_move_y and dy != 0:
-            # Camera can move vertically - keep cursor centered
-            camera.target_y = new_camera_y
-            self.cursor_offset_y = 0
-        elif dy != 0:
-            # Camera at vertical edge - move cursor instead
-            new_offset_y = self.cursor_offset_y + dy
-            # Limit cursor movement to viewport bounds
-            max_offset = half_height - 1
-            self.cursor_offset_y = max(-max_offset, min(max_offset, new_offset_y))
+        # Clamp camera to world bounds, keeping cursor centered when possible
+        # Left edge: cursor can be at center if camera is at least half_width from left
+        min_camera_x = half_width
+        max_camera_x = world_width - half_width - 1
 
-        # Auto-return cursor to center when possible
-        self._auto_return_cursor_to_center()
+        min_camera_y = half_height
+        max_camera_y = world_height - half_height - 1
+
+        # If viewport is larger than world, center the world
+        if visible_width >= world_width:
+            camera.target_x = world_width // 2
+        else:
+            camera.target_x = max(min_camera_x, min(max_camera_x, new_x))
+
+        if visible_height >= world_height:
+            camera.target_y = world_height // 2
+        else:
+            camera.target_y = max(min_camera_y, min(max_camera_y, new_y))
+
+        # Ensure camera position is within world bounds
+        camera.target_x = max(0, min(world_width - 1, camera.target_x))
+        camera.target_y = max(0, min(world_height - 1, camera.target_y))
 
     def _auto_return_cursor_to_center(self):
         """Auto-return cursor to center when camera can move away from edges."""
@@ -498,33 +491,52 @@ class Game:
         self._update_fps()
 
     def _render_world_scale(self):
-        """Render world scale view with cursor highlighting."""
+        """Render world scale as 128x96 grid with fixed center cursor."""
         viewport = self.camera.get_viewport_info()
-        camera_x, camera_y = int(viewport.camera_x), int(viewport.camera_y)
 
-        # Calculate viewport bounds
-        half_width = viewport.viewport_width // 2
-        half_height = viewport.viewport_height // 2
+        # World map is 128x96 - render what fits in viewport
+        world_width, world_height = 128, 96
 
-        start_x = max(0, camera_x - half_width)
-        start_y = max(0, camera_y - half_height)
-        end_x = min(len(self.world_map[0]), camera_x + half_width + 1)
-        end_y = min(len(self.world_map), camera_y + half_height + 1)
+        # Calculate how much of the world map we can show
+        visible_width = min(viewport.viewport_width, world_width)
+        visible_height = min(viewport.viewport_height, world_height)
+
+        # Calculate camera position (what part of world to show)
+        camera = self.camera.camera_positions[ViewScale.WORLD]
+
+        # Calculate world area to display
+        start_x = max(0, int(camera.x - visible_width // 2))
+        start_y = max(0, int(camera.y - visible_height // 2))
+        end_x = min(world_width, start_x + visible_width)
+        end_y = min(world_height, start_y + visible_height)
+
+        # Adjust start if we hit the right/bottom edge
+        if end_x == world_width:
+            start_x = max(0, world_width - visible_width)
+        if end_y == world_height:
+            start_y = max(0, world_height - visible_height)
+
+        # Calculate cursor position on screen
+        cursor_world_x = int(camera.x)
+        cursor_world_y = int(camera.y)
+
+        # Cursor screen position (normally center, but can move at edges)
+        cursor_screen_x = viewport.viewport_start_x + (cursor_world_x - start_x)
+        cursor_screen_y = viewport.viewport_start_y + (cursor_world_y - start_y)
 
         # Render world tiles
-        for y in range(start_y, end_y):
-            for x in range(start_x, end_x):
-                if 0 <= y < len(self.world_map) and 0 <= x < len(self.world_map[0]):
-                    tile = self.world_map[y][x]
-                    screen_x = viewport.viewport_start_x + (x - start_x)
-                    screen_y = viewport.viewport_start_y + (y - start_y)
+        for world_y in range(start_y, end_y):
+            for world_x in range(start_x, end_x):
+                if 0 <= world_y < len(self.world_map) and 0 <= world_x < len(self.world_map[0]):
+                    tile = self.world_map[world_y][world_x]
+                    screen_x = viewport.viewport_start_x + (world_x - start_x)
+                    screen_y = viewport.viewport_start_y + (world_y - start_y)
 
                     if (0 <= screen_x < self.console.width and
                         0 <= screen_y < self.console.height):
 
-                        # Highlight cursor tile using unified cursor system
-                        cursor_world_x, cursor_world_y = self._get_cursor_world_coordinates()
-                        if (x == int(cursor_world_x) and y == int(cursor_world_y) and self.show_cursor):
+                        # Highlight cursor tile
+                        if (world_x == cursor_world_x and world_y == cursor_world_y and self.show_cursor):
                             self.console.print(screen_x, screen_y, tile.char,
                                              fg=self.cursor_color, bg=self.cursor_bg_color)
                         else:
@@ -629,24 +641,22 @@ class Game:
         current_scale = self.camera.get_current_scale()
         camera_x, camera_y = self.camera.get_camera_position()
 
-        # Top status bar with unified cursor coordinates
+        # Top status bar with proper coordinates
         if current_scale == ViewScale.WORLD:
-            cursor_x, cursor_y = self._get_cursor_world_coordinates()
-            status_text = f"Scale: {current_scale.value.title()} | Cursor: ({cursor_x:.1f},{cursor_y:.1f})"
+            # World scale shows camera position (which is cursor position)
+            camera = self.camera.camera_positions[ViewScale.WORLD]
+            status_text = f"Scale: World (128x96) | Cursor: ({int(camera.x)},{int(camera.y)})"
         elif current_scale == ViewScale.REGIONAL:
             cursor_x, cursor_y = self._get_cursor_regional_coordinates()
-            status_text = f"Scale: {current_scale.value.title()} | Cursor: ({cursor_x:.1f},{cursor_y:.1f})"
+            status_text = f"Scale: Regional | Cursor: ({cursor_x:.1f},{cursor_y:.1f})"
         else:  # LOCAL
             cursor_x, cursor_y = self._get_cursor_local_coordinates()
             z_level_name = {-1: "Underground", 0: "Surface", 1: "Elevated"}[self.current_z_level]
-            status_text = f"Scale: {current_scale.value.title()} | Cursor: ({cursor_x:.1f},{cursor_y:.1f}) | Z-Level: {z_level_name}"
+            status_text = f"Scale: Local | Cursor: ({cursor_x:.1f},{cursor_y:.1f}) | Z-Level: {z_level_name}"
 
-        # Add cursor status and offset info
+        # Add cursor status
         if self.show_cursor:
-            if self.cursor_offset_x != 0 or self.cursor_offset_y != 0:
-                status_text += f" | Cursor: ON (offset: {self.cursor_offset_x},{self.cursor_offset_y})"
-            else:
-                status_text += f" | Cursor: ON (centered)"
+            status_text += f" | Cursor: ON"
         else:
             status_text += f" | Cursor: OFF"
 
@@ -679,27 +689,33 @@ class Game:
 
     def run(self) -> None:
         """Main game loop."""
-        # Use tcod's built-in larger font for better readability
+        # Use a proportional (non-square) font for better readability
         try:
-            # Load a larger built-in font (16x16 is good for readability)
-            tileset = tcod.tileset.load_truetype_font("DejaVuSansMono.ttf", 16, 16)
+            # Load a proportional TrueType font - wider than tall for readability
+            tileset = tcod.tileset.load_truetype_font("Arial.ttf", 12, 18)  # 12 wide, 18 tall = proportional
         except:
             try:
-                # Fallback to built-in bitmap font
-                tileset = tcod.tileset.load_tilesheet(
-                    tcod.tileset.FONT_FILE, 16, 16, tcod.tileset.CHARMAP_CP437
-                )
+                # Fallback to another proportional font
+                tileset = tcod.tileset.load_truetype_font("DejaVuSans.ttf", 12, 18)
             except:
-                # Final fallback - use default
-                tileset = None
+                try:
+                    # Last resort - use system default but make it proportional
+                    tileset = tcod.tileset.load_truetype_font("", 12, 18)  # Empty string uses system default
+                except:
+                    # Final fallback - no custom font
+                    tileset = None
 
-        # Create context with improved font
+        # Create context with proper aspect ratio (no stretching)
         context = tcod.context.new(
             columns=self.screen_width,
             rows=self.screen_height,
             title="Covenant: Blood & Fire - Multi-Scale World Explorer",
             vsync=True,
             tileset=tileset,
+            # Prevent stretching - maintain square characters
+            renderer=tcod.context.RENDERER_SDL2,
+            # Keep aspect ratio
+            resizable=True,
         )
 
         try:
