@@ -37,13 +37,6 @@ class Game:
         # Game state
         self.running = True
 
-        # Initialize configuration system
-        self.config = get_world_config()
-
-        # Create config file if in development mode
-        if self.config.is_development_mode():
-            create_world_config_file()
-
         # NEW: Multi-scale world generation system
         world_seed = 1712738967  # Fixed seed for testing
         print(f"Initializing world with seed: {world_seed}")
