@@ -712,10 +712,6 @@ class Game:
             title="Covenant: Blood & Fire - Multi-Scale World Explorer",
             vsync=True,
             tileset=tileset,
-            # Prevent stretching - maintain square characters
-            renderer=tcod.context.RENDERER_SDL2,
-            # Keep aspect ratio
-            resizable=True,
         )
 
         try:
