@@ -6,9 +6,11 @@ view across World, Regional, and Local scales.
 """
 
 from .multi_scale_camera import MultiScaleCameraSystem
-from .viewport_renderer import MultiScaleViewportRenderer
+
+# Note: viewport_renderer requires tcod and is not imported by default
+# from .viewport_renderer import MultiScaleViewportRenderer
 
 __all__ = [
     'MultiScaleCameraSystem',
-    'MultiScaleViewportRenderer'
+    # 'MultiScaleViewportRenderer'  # Commented out due to tcod dependency
 ]
