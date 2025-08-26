@@ -230,8 +230,12 @@ class Game:
             # Generate regional map for current world sector if needed
             if self.current_regional_map is None:
                 world_tile = self.world_map[self.current_world_sector[1]][self.current_world_sector[0]]
+
+                # Get neighboring world tiles (simplified - empty dict for now)
+                neighboring_tiles = {}  # TODO: Add actual neighboring tile lookup
+
                 self.current_regional_map = self.regional_generator.generate_regional_map(
-                    world_tile, self.current_world_sector[0], self.current_world_sector[1]
+                    world_tile, neighboring_tiles
                 )
                 print(f"Generated regional map for world sector {self.current_world_sector}")
 
