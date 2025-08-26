@@ -69,6 +69,10 @@ class Game:
         self.regional_render_distance = max(self.camera.viewport_width, self.camera.viewport_height) * 2
         self.local_render_distance = max(self.camera.viewport_width, self.camera.viewport_height) * 2
 
+        # Continuous map storage for regional and local scales
+        self.regional_map_cache = {}  # Cache regional blocks by world sector
+        self.local_map_cache = {}     # Cache local chunks by regional block
+
         # Z-level for local map navigation
         self.current_z_level = 0  # 0 = surface, +1 = elevated, -1 = underground
 
@@ -260,24 +264,12 @@ class Game:
         current_scale = self.camera.get_current_scale()
 
         if current_scale == ViewScale.REGIONAL:
-            # Generate regional map for current world sector if needed
-            if self.current_regional_map is None:
-                world_tile = self.world_map[self.current_world_sector[1]][self.current_world_sector[0]]
-
-                # Get neighboring world tiles (simplified - empty dict for now)
-                neighboring_tiles = {}  # TODO: Add actual neighboring tile lookup
-
-                self.current_regional_map = self.regional_generator.generate_regional_map(
-                    world_tile, neighboring_tiles
-                )
-                print(f"Generated regional map for world sector {self.current_world_sector}")
+            # Generate continuous regional map around current position
+            self._generate_continuous_regional_map()
 
         elif current_scale == ViewScale.LOCAL:
-            # Generate local map for current regional block if needed
-            if self.current_local_map is None and self.current_regional_map is not None:
-                regional_tile = self.current_regional_map[self.current_regional_block[1]][self.current_regional_block[0]]
-                self.current_local_map = self.local_generator.generate_local_chunk(regional_tile, {})
-                print(f"Generated local map for regional block {self.current_regional_block}")
+            # Generate continuous local map around current position
+            self._generate_continuous_local_map()
 
     def _transition_to_world_scale(self):
         """Transition to world scale."""
@@ -461,6 +453,114 @@ class Game:
 
         return cursor_x, cursor_y
 
+    def _generate_continuous_regional_map(self):
+        """Generate continuous regional map with render distance around current position."""
+        camera = self.camera.camera_positions[ViewScale.REGIONAL]
+        viewport = self.camera.get_viewport_info()
+
+        # Calculate render area (2x screen size)
+        render_width = viewport.viewport_width * 2
+        render_height = viewport.viewport_height * 2
+
+        # Calculate which world sectors we need to generate
+        camera_world_x = self.current_world_sector[0]
+        camera_world_y = self.current_world_sector[1]
+
+        # Calculate how many world sectors we need to cover the render distance
+        sectors_x = max(1, render_width // 32 + 1)
+        sectors_y = max(1, render_height // 32 + 1)
+
+        start_sector_x = camera_world_x - sectors_x // 2
+        start_sector_y = camera_world_y - sectors_y // 2
+
+        # Generate regional blocks for needed world sectors
+        continuous_map = {}
+
+        for sector_y in range(start_sector_y, start_sector_y + sectors_y):
+            for sector_x in range(start_sector_x, start_sector_x + sectors_x):
+                # Clamp to world bounds
+                if 0 <= sector_x < 128 and 0 <= sector_y < 96:
+                    sector_key = (sector_x, sector_y)
+
+                    if sector_key not in self.regional_map_cache:
+                        # Generate regional map for this world sector
+                        world_tile = self.world_map[sector_y][sector_x]
+                        neighboring_tiles = {}  # TODO: Add actual neighbors
+
+                        regional_map = self.regional_generator.generate_regional_map(
+                            world_tile, neighboring_tiles
+                        )
+                        self.regional_map_cache[sector_key] = regional_map
+                        print(f"Generated regional map for world sector ({sector_x}, {sector_y})")
+
+                    # Add this sector's regional blocks to continuous map
+                    sector_map = self.regional_map_cache[sector_key]
+                    for local_y in range(32):
+                        for local_x in range(32):
+                            # Calculate global regional coordinates
+                            global_x = sector_x * 32 + local_x
+                            global_y = sector_y * 32 + local_y
+                            continuous_map[(global_x, global_y)] = sector_map[local_y][local_x]
+
+        self.current_regional_map = continuous_map
+        print(f"Generated continuous regional map covering {len(continuous_map)} blocks")
+
+    def _generate_continuous_local_map(self):
+        """Generate continuous local map with render distance around current position."""
+        camera = self.camera.camera_positions[ViewScale.LOCAL]
+        viewport = self.camera.get_viewport_info()
+
+        # Calculate render area (2x screen size)
+        render_width = viewport.viewport_width * 2
+        render_height = viewport.viewport_height * 2
+
+        # Calculate which regional blocks we need to generate
+        camera_regional_x = self.current_regional_block[0]
+        camera_regional_y = self.current_regional_block[1]
+
+        # Calculate how many regional blocks we need to cover the render distance
+        blocks_x = max(1, render_width // 32 + 1)
+        blocks_y = max(1, render_height // 32 + 1)
+
+        start_block_x = camera_regional_x - blocks_x // 2
+        start_block_y = camera_regional_y - blocks_y // 2
+
+        # Generate local chunks for needed regional blocks
+        continuous_map = {}
+
+        for block_y in range(start_block_y, start_block_y + blocks_y):
+            for block_x in range(start_block_x, start_block_x + blocks_x):
+                # Calculate global regional coordinates
+                global_regional_x = self.current_world_sector[0] * 32 + block_x
+                global_regional_y = self.current_world_sector[1] * 32 + block_y
+
+                # Check if this regional block exists
+                if (global_regional_x, global_regional_y) in self.current_regional_map:
+                    block_key = (block_x, block_y)
+
+                    if block_key not in self.local_map_cache:
+                        # Generate local map for this regional block
+                        regional_tile = self.current_regional_map[(global_regional_x, global_regional_y)]
+                        neighboring_tiles = {}  # TODO: Add actual neighbors
+
+                        local_map = self.local_generator.generate_local_chunk(
+                            regional_tile, neighboring_tiles
+                        )
+                        self.local_map_cache[block_key] = local_map
+                        print(f"Generated local map for regional block ({block_x}, {block_y})")
+
+                    # Add this block's local chunks to continuous map
+                    block_map = self.local_map_cache[block_key]
+                    for local_y in range(32):
+                        for local_x in range(32):
+                            # Calculate global local coordinates
+                            global_x = block_x * 32 + local_x
+                            global_y = block_y * 32 + local_y
+                            continuous_map[(global_x, global_y)] = block_map[local_y][local_x]
+
+        self.current_local_map = continuous_map
+        print(f"Generated continuous local map covering {len(continuous_map)} chunks")
+
 
 
 
@@ -544,39 +644,44 @@ class Game:
                                              fg=tile.fg_color, bg=tile.bg_color)
 
     def _render_regional_scale(self):
-        """Render regional scale view."""
+        """Render regional scale view with continuous map."""
         # Ensure regional map is generated
         self._update_context_for_scale_change()
 
-        if self.current_regional_map is None:
+        if self.current_regional_map is None or len(self.current_regional_map) == 0:
             self.console.print(10, 10, "Generating regional map...", fg=(255, 255, 255))
             return
 
         viewport = self.camera.get_viewport_info()
-        camera_x, camera_y = int(viewport.camera_x), int(viewport.camera_y)
+        camera = self.camera.camera_positions[ViewScale.REGIONAL]
 
-        # Calculate viewport bounds
-        start_x = max(0, camera_x - viewport.viewport_width // 2)
-        start_y = max(0, camera_y - viewport.viewport_height // 2)
-        end_x = min(len(self.current_regional_map[0]), start_x + viewport.viewport_width)
-        end_y = min(len(self.current_regional_map), start_y + viewport.viewport_height)
+        # Calculate viewport bounds for continuous map
+        half_width = viewport.viewport_width // 2
+        half_height = viewport.viewport_height // 2
 
-        # Render regional tiles
+        start_x = int(camera.x - half_width)
+        start_y = int(camera.y - half_height)
+        end_x = start_x + viewport.viewport_width
+        end_y = start_y + viewport.viewport_height
+
+        # Calculate cursor position
+        cursor_regional_x = int(camera.x + self.cursor_offset_x)
+        cursor_regional_y = int(camera.y + self.cursor_offset_y)
+
+        # Render regional tiles from continuous map
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
-                if 0 <= y < len(self.current_regional_map) and 0 <= x < len(self.current_regional_map[0]):
-                    tile = self.current_regional_map[y][x]
+                # Check if this coordinate exists in our continuous map
+                if (x, y) in self.current_regional_map:
+                    tile = self.current_regional_map[(x, y)]
                     screen_x = viewport.viewport_start_x + (x - start_x)
                     screen_y = viewport.viewport_start_y + (y - start_y)
 
                     if (0 <= screen_x < self.console.width and
                         0 <= screen_y < self.console.height):
 
-                        # Highlight cursor tile using unified cursor system
-                        cursor_screen_x = viewport.viewport_start_x + viewport.viewport_width // 2 + self.cursor_offset_x
-                        cursor_screen_y = viewport.viewport_start_y + viewport.viewport_height // 2 + self.cursor_offset_y
-
-                        if screen_x == cursor_screen_x and screen_y == cursor_screen_y and self.show_cursor:
+                        # Highlight cursor tile
+                        if x == cursor_regional_x and y == cursor_regional_y and self.show_cursor:
                             self.console.print(screen_x, screen_y, tile.char,
                                              fg=self.cursor_color, bg=self.cursor_bg_color)
                         else:
@@ -584,28 +689,36 @@ class Game:
                                              fg=tile.fg_color, bg=tile.bg_color)
 
     def _render_local_scale(self):
-        """Render local scale view."""
+        """Render local scale view with continuous map."""
         # Ensure local map is generated
         self._update_context_for_scale_change()
 
-        if self.current_local_map is None:
+        if self.current_local_map is None or len(self.current_local_map) == 0:
             self.console.print(10, 10, "Generating local map...", fg=(255, 255, 255))
             return
 
         viewport = self.camera.get_viewport_info()
-        camera_x, camera_y = int(viewport.camera_x), int(viewport.camera_y)
+        camera = self.camera.camera_positions[ViewScale.LOCAL]
 
-        # Calculate viewport bounds
-        start_x = max(0, camera_x - viewport.viewport_width // 2)
-        start_y = max(0, camera_y - viewport.viewport_height // 2)
-        end_x = min(len(self.current_local_map[0]), start_x + viewport.viewport_width)
-        end_y = min(len(self.current_local_map), start_y + viewport.viewport_height)
+        # Calculate viewport bounds for continuous map
+        half_width = viewport.viewport_width // 2
+        half_height = viewport.viewport_height // 2
 
-        # Render local tiles (filter by Z-level)
+        start_x = int(camera.x - half_width)
+        start_y = int(camera.y - half_height)
+        end_x = start_x + viewport.viewport_width
+        end_y = start_y + viewport.viewport_height
+
+        # Calculate cursor position
+        cursor_local_x = int(camera.x + self.cursor_offset_x)
+        cursor_local_y = int(camera.y + self.cursor_offset_y)
+
+        # Render local tiles from continuous map (filter by Z-level)
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
-                if 0 <= y < len(self.current_local_map) and 0 <= x < len(self.current_local_map[0]):
-                    tile = self.current_local_map[y][x]
+                # Check if this coordinate exists in our continuous map
+                if (x, y) in self.current_local_map:
+                    tile = self.current_local_map[(x, y)]
 
                     # Filter by Z-level
                     tile_z = 0  # Default to surface
@@ -623,11 +736,8 @@ class Game:
                         if (0 <= screen_x < self.console.width and
                             0 <= screen_y < self.console.height):
 
-                            # Highlight cursor tile using unified cursor system
-                            cursor_screen_x = viewport.viewport_start_x + viewport.viewport_width // 2 + self.cursor_offset_x
-                            cursor_screen_y = viewport.viewport_start_y + viewport.viewport_height // 2 + self.cursor_offset_y
-
-                            if screen_x == cursor_screen_x and screen_y == cursor_screen_y and self.show_cursor:
+                            # Highlight cursor tile
+                            if x == cursor_local_x and y == cursor_local_y and self.show_cursor:
                                 self.console.print(screen_x, screen_y, tile.char,
                                                  fg=self.cursor_color, bg=self.cursor_bg_color)
                             else:
