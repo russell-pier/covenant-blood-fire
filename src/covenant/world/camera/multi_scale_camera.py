@@ -64,9 +64,10 @@ class ViewportInfo:
 class MultiScaleCameraSystem:
     """Unified camera system handling all three scales with smooth transitions"""
 
-    def __init__(self, console_width: int = 80, console_height: int = 50):
+    def __init__(self, console_width: int = 80, console_height: int = 50, seed: Optional[int] = None):
         self.console_width = console_width
         self.console_height = console_height
+        self.seed = seed  # Store seed for compatibility (currently unused)
 
         # Reserve space for UI (preserve existing UI layout)
         self.ui_top_height = 3     # Status bar
