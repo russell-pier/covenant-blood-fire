@@ -55,7 +55,7 @@ class Game:
 
         # Generate the world
         print("Generating world...")
-        self.world_map = self.world_generator.generate_world()
+        self.world_map = self.world_generator.generate_complete_world()
         print("World generation complete!")
 
         # Current context for regional/local generation
