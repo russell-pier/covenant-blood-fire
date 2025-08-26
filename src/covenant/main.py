@@ -5,18 +5,14 @@ import os
 import shutil
 
 # NEW: Multi-scale world generation imports
-from .world.generators.world_scale import WorldScaleGenerator
+from .world.generators.world_generator import WorldScaleGenerator
+from .world.generators.regional_generator import RegionalScaleGenerator
+from .world.generators.local_generator import LocalScaleGenerator
 from .world.camera.multi_scale_camera import MultiScaleCameraSystem
-from .world.camera.viewport_renderer import MultiScaleViewportRenderer
 from .world.data.scale_types import ViewScale
-from .world.data.config import get_world_config, create_world_config_file
+from .world.data.tilemap import get_tile
 
-# Legacy imports for Local scale integration (Phase 5)
-from .camera.viewport import create_viewport_system
-from .world.generator import create_default_world_generator
-from .commands import CommandRegistry, CommandPalette, register_layer_commands
-from .ui import create_instructions_panel, create_status_bar
-from .ui.zoomed_map import ZoomedMapRenderer
+# Remove legacy imports - using new system only
 
 
 class Game:
@@ -49,37 +45,34 @@ class Game:
             create_world_config_file()
 
         # NEW: Multi-scale world generation system
-        world_seed = self.config.get_world_seed()
+        world_seed = 1712738967  # Fixed seed for testing
         print(f"Initializing world with seed: {world_seed}")
 
-        self.world_scale_generator = WorldScaleGenerator(seed=world_seed)
-        self.multi_scale_camera = MultiScaleCameraSystem(seed=world_seed)
-        self.multi_scale_renderer = MultiScaleViewportRenderer(
-            self.world_scale_generator,
-            self.multi_scale_camera
+        # Initialize all three scale generators
+        self.world_generator = WorldScaleGenerator(seed=world_seed)
+        self.regional_generator = RegionalScaleGenerator(seed=world_seed)
+        self.local_generator = LocalScaleGenerator(seed=world_seed)
+
+        # Initialize camera system
+        self.camera = MultiScaleCameraSystem(
+            console_width=self.screen_width,
+            console_height=self.screen_height,
+            seed=world_seed
         )
 
-        # Legacy systems for Local scale integration (Phase 5)
-        self.world_generator = create_default_world_generator(seed=world_seed)
-        self.legacy_camera, self.legacy_viewport = create_viewport_system()
+        # Generate the world
+        print("Generating world...")
+        self.world_map = self.world_generator.generate_world()
+        print("World generation complete!")
 
-        # UI components (preserved from existing design)
-        self.instructions_panel = create_instructions_panel()
-        self.status_bar = create_status_bar()
+        # Current context for regional/local generation
+        self.current_world_sector = (64, 48)  # Center of world
+        self.current_regional_block = (16, 16)  # Center of regional area
+        self.current_regional_map = None
+        self.current_local_map = None
 
-        # Command system (preserved for Local scale)
-        self.command_registry = CommandRegistry()
-        self.command_palette = CommandPalette(self.command_registry)
-        register_layer_commands(self.command_registry, self.world_generator, self.instructions_panel, self.status_bar)
-
-        # Legacy zoomed map renderer (for Local scale integration)
-        self.map_renderer = ZoomedMapRenderer(self.world_generator, self.console.width, self.console.height)
-
-        # Update multi-scale renderer with current console size
-        self.multi_scale_renderer.update_console_size(self.screen_width, self.screen_height)
-
-        # Preload initial chunks around spawn point (for Local scale)
-        self.world_generator.preload_chunks_around(0, 0)
+        # Z-level for local map navigation
+        self.current_z_level = 0  # 0 = surface, +1 = elevated, -1 = underground
 
         # Performance monitoring
         self.frame_count = 0
@@ -91,12 +84,16 @@ class Game:
         self.resize_debounce_delay = 0.1  # 100ms debounce
         self.stable_size = (self.screen_width, self.screen_height)
 
-        # Multi-scale system state
-        self.show_world_info = False
-        self.last_scale_switch_time = time.time()
-
         print(f"Game initialized with {self.screen_width}×{self.screen_height} console")
-        print(f"Starting in {self.multi_scale_camera.get_current_scale().value} scale")
+        print(f"Starting in {self.camera.get_current_scale().value} scale")
+
+    def _update_camera_dimensions(self):
+        """Update camera dimensions to match current screen size."""
+        # Update the camera system with new console dimensions
+        self.camera.console_width = self.screen_width
+        self.camera.console_height = self.screen_height
+        self.camera.viewport_width = self.screen_width - (2 * self.camera.ui_side_margin)
+        self.camera.viewport_height = self.screen_height - self.camera.ui_top_height - self.camera.ui_bottom_height
 
     def _get_terminal_size(self):
         """Get the current terminal size, with fallback to default."""
@@ -121,8 +118,9 @@ class Game:
             self.screen_width = new_width
             self.screen_height = new_height
 
-            # Update multi-scale renderer with new dimensions
-            self.multi_scale_renderer.update_console_size(new_width, new_height)
+            # Update camera with new dimensions
+            self.camera.console_width = new_width
+            self.camera.console_height = new_height
 
             # Create new console with updated dimensions
             self.console = tcod.console.Console(self.screen_width, self.screen_height)
@@ -174,47 +172,33 @@ class Game:
 
     def handle_keydown(self, event: tcod.event.KeyDown) -> None:
         """Handle keyboard input for multi-scale system."""
-        # First, let command palette handle input if it's open
-        if self.command_palette.handle_input(event):
-            return
-
         key = event.sym
 
-        # Command palette toggle (CMD+K or CTRL+K)
-        if ((event.mod & tcod.event.Modifier.LCTRL or event.mod & tcod.event.Modifier.RCTRL or
-             event.mod & tcod.event.Modifier.LGUI or event.mod & tcod.event.Modifier.RGUI) and
-            key == tcod.event.KeySym.K):
-            self.command_palette.open()
+        # Scale switching with z,x,c keys
+        if key == tcod.event.KeySym.Z:
+            self.camera.transition_to_scale(ViewScale.WORLD)
+            self._update_context_for_scale_change()
+            return
+        elif key == tcod.event.KeySym.X:
+            self.camera.transition_to_scale(ViewScale.REGIONAL)
+            self._update_context_for_scale_change()
+            return
+        elif key == tcod.event.KeySym.C:
+            self.camera.transition_to_scale(ViewScale.LOCAL)
+            self._update_context_for_scale_change()
             return
 
-        # Scale switching (always available)
-        if key == tcod.event.KeySym.N1:
-            self.multi_scale_camera.change_scale(ViewScale.WORLD)
-            self.last_scale_switch_time = time.time()
-            return
-        elif key == tcod.event.KeySym.N2:
-            old_scale = self.multi_scale_camera.get_current_scale()
-            self.multi_scale_camera.change_scale(ViewScale.REGIONAL)
-
-            # When switching to regional, center on the current world position
-            if old_scale == ViewScale.WORLD:
-                # Get world camera position and convert to regional coordinates
-                world_cam_x, world_cam_y = self.multi_scale_camera.get_camera_position()
-                # Center regional camera (16,16 is center of 32x32 regional view)
-                self.multi_scale_camera.set_camera_position(16, 16)
-
-            self.last_scale_switch_time = time.time()
-            return
-        elif key == tcod.event.KeySym.N3:
-            old_scale = self.multi_scale_camera.get_current_scale()
-            self.multi_scale_camera.change_scale(ViewScale.LOCAL)
-            # Sync legacy camera when switching to local scale
-            if old_scale != ViewScale.LOCAL:
-                self._sync_legacy_to_multi_scale_camera()
-            self.last_scale_switch_time = time.time()
-            return
-
-        current_scale = self.multi_scale_camera.get_current_scale()
+        # Z-level switching with < and > keys (only in local scale)
+        current_scale = self.camera.get_current_scale()
+        if current_scale == ViewScale.LOCAL:
+            if key == tcod.event.KeySym.COMMA and (event.mod & tcod.event.Modifier.LSHIFT):  # < key
+                self.current_z_level = max(-1, self.current_z_level - 1)
+                print(f"Z-level: {self.current_z_level} ({'Underground' if self.current_z_level < 0 else 'Surface' if self.current_z_level == 0 else 'Elevated'})")
+                return
+            elif key == tcod.event.KeySym.PERIOD and (event.mod & tcod.event.Modifier.LSHIFT):  # > key
+                self.current_z_level = min(1, self.current_z_level + 1)
+                print(f"Z-level: {self.current_z_level} ({'Underground' if self.current_z_level < 0 else 'Surface' if self.current_z_level == 0 else 'Elevated'})")
+                return
 
         # Movement keys (WASD and arrow keys)
         dx, dy = 0, 0
@@ -228,198 +212,185 @@ class Game:
             dx = 1
 
         if dx != 0 or dy != 0:
-            if current_scale == ViewScale.LOCAL:
-                # Use existing camera system for detailed view
-                self.legacy_camera.move(dx, dy)
-                # Update world generator with new camera position
-                world_x, world_y = self.legacy_camera.get_position()
-                self.world_generator.update_camera_position(world_x, world_y)
-
-                # Sync multi-scale camera to match legacy camera position
-                self._sync_multi_scale_to_legacy_camera()
-            else:
-                # Use multi-scale camera for world/regional
-                self.multi_scale_camera.move_camera(dx, dy)
+            self.camera.move_camera(dx, dy)
             return
 
-        # Drill down functionality
-        if key == tcod.event.KeySym.RETURN or key == tcod.event.KeySym.KP_ENTER:
-            if current_scale == ViewScale.WORLD:
-                # Drill down to regional view, centered on current world position
-                self.multi_scale_camera.change_scale(ViewScale.REGIONAL)
-                # Center regional camera
-                self.multi_scale_camera.set_camera_position(16, 16)
-            elif current_scale == ViewScale.REGIONAL:
-                # Drill down to local view
-                self.multi_scale_camera.change_scale(ViewScale.LOCAL)
-                self._sync_legacy_to_multi_scale_camera()
-            return
-
-        # Info toggle for world/regional scales
-        if key == tcod.event.KeySym.I:
-            if current_scale in [ViewScale.WORLD, ViewScale.REGIONAL]:
-                self.show_world_info = not self.show_world_info
-                return
-
-        # Legacy controls (only in LOCAL scale)
-        if current_scale == ViewScale.LOCAL:
-            # Layer switching hotkeys
-            hotkey_char = None
-            if key == tcod.event.KeySym.Z:
-                hotkey_char = 'z'
-            elif key == tcod.event.KeySym.X:
-                hotkey_char = 'x'
-            elif key == tcod.event.KeySym.C:
-                hotkey_char = 'c'
-            elif key == tcod.event.KeySym.M:
-                # Toggle map mode
-                self.map_renderer.toggle_map_mode()
-                mode_name = "Overview" if self.map_renderer.is_overview_mode() else "Detailed"
-                print(f"Switched to {mode_name} mode")
-                return
-
-            if hotkey_char:
-                hotkey_handled = self.command_registry.execute_hotkey(hotkey_char)
-                if hotkey_handled:
-                    return
-
-        # Quit key (ESC or Q)
+        # Quit
         if key == tcod.event.KeySym.ESCAPE or key == tcod.event.KeySym.Q:
-            self.running = False
+            raise SystemExit()
 
-    def _sync_multi_scale_to_legacy_camera(self) -> None:
-        """Sync multi-scale camera position to match legacy camera (less aggressive)."""
-        world_x, world_y = self.legacy_camera.get_position()
+    def _update_context_for_scale_change(self):
+        """Update context when changing scales to ensure proper map generation."""
+        current_scale = self.camera.get_current_scale()
 
-        # Update local scale position in multi-scale camera (only for local scale)
-        if self.multi_scale_camera.get_current_scale() == ViewScale.LOCAL:
-            local_x = world_x // 32  # Convert to chunk coordinates
-            local_y = world_y // 32
-            self.multi_scale_camera.set_camera_position(local_x, local_y)
+        if current_scale == ViewScale.REGIONAL:
+            # Generate regional map for current world sector if needed
+            if self.current_regional_map is None:
+                world_tile = self.world_map[self.current_world_sector[1]][self.current_world_sector[0]]
+                self.current_regional_map = self.regional_generator.generate_regional_sector(
+                    world_tile, self.current_world_sector[0], self.current_world_sector[1]
+                )
+                print(f"Generated regional map for world sector {self.current_world_sector}")
 
-    def _sync_legacy_to_multi_scale_camera(self) -> None:
-        """Sync legacy camera position to match multi-scale camera when switching to local."""
-        if self.multi_scale_camera.get_current_scale() == ViewScale.LOCAL:
-            # Get the center of the current multi-scale local chunk
-            world_x, world_y = self.multi_scale_camera.get_current_world_coordinates()
+        elif current_scale == ViewScale.LOCAL:
+            # Generate local map for current regional block if needed
+            if self.current_local_map is None and self.current_regional_map is not None:
+                regional_tile = self.current_regional_map[self.current_regional_block[1]][self.current_regional_block[0]]
+                self.current_local_map = self.local_generator.generate_local_chunk(regional_tile, {})
+                print(f"Generated local map for regional block {self.current_regional_block}")
 
-            # Center the legacy camera in that chunk (add half chunk size for centering)
-            centered_x = world_x + 16  # Half of 32-tile chunk
-            centered_y = world_y + 16
 
-            self.legacy_camera.set_position(centered_x, centered_y)
 
-            # Update world generator
-            self.world_generator.update_camera_position(centered_x, centered_y)
+
 
     def render(self) -> None:
         """Render the game using the multi-scale system."""
         # Clear the console
         self.console.clear(fg=(255, 255, 255), bg=(0, 0, 0))
 
-        current_scale = self.multi_scale_camera.get_current_scale()
+        # Update camera system
+        dt = 1.0 / 60.0  # Assume 60 FPS for smooth transitions
+        self.camera.update(dt)
 
-        if current_scale == ViewScale.LOCAL:
-            # Use existing detailed rendering system for Local scale
-            self._render_detailed_local_view()
-        else:
-            # Use new multi-scale rendering for World/Regional scales
-            self.multi_scale_renderer.render_current_scale(self.console)
+        current_scale = self.camera.get_current_scale()
 
-        # Always render UI elements
-        self._render_ui_elements()
+        # Render based on current scale
+        if current_scale == ViewScale.WORLD:
+            self._render_world_scale()
+        elif current_scale == ViewScale.REGIONAL:
+            self._render_regional_scale()
+        elif current_scale == ViewScale.LOCAL:
+            self._render_local_scale()
 
-        # Render command palette (if open)
-        self.command_palette.render(self.console)
+        # Render UI
+        self._render_ui()
 
         # Update FPS counter
         self._update_fps()
 
-    def _render_detailed_local_view(self) -> None:
-        """Render detailed local view using existing systems."""
-        # Use the legacy camera position directly - don't sync from multi-scale
-        # This allows smooth tile-by-tile movement in local view
-        camera_x, camera_y = self.legacy_camera.get_position()
-        self.map_renderer.set_camera_position(camera_x, camera_y)
+    def _render_world_scale(self):
+        """Render world scale view."""
+        viewport = self.camera.get_viewport_info()
+        camera_x, camera_y = int(viewport.camera_x), int(viewport.camera_y)
 
-        # Update animals continuously (every frame)
-        self.world_generator.update_animals_continuous()
+        # Calculate viewport bounds
+        start_x = max(0, camera_x - viewport.viewport_width // 2)
+        start_y = max(0, camera_y - viewport.viewport_height // 2)
+        end_x = min(len(self.world_map[0]), start_x + viewport.viewport_width)
+        end_y = min(len(self.world_map), start_y + viewport.viewport_height)
 
-        # Store original camera settings for full screen rendering
-        original_width = self.legacy_camera.screen_width
-        original_height = self.legacy_camera.screen_height
-        original_crosshair_x = self.legacy_camera.config.crosshair_x
-        original_crosshair_y = self.legacy_camera.config.crosshair_y
+        # Render world tiles
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
+                if 0 <= y < len(self.world_map) and 0 <= x < len(self.world_map[0]):
+                    tile = self.world_map[y][x]
+                    screen_x = viewport.viewport_start_x + (x - start_x)
+                    screen_y = viewport.viewport_start_y + (y - start_y)
 
-        # Set camera to full screen dimensions
-        self.legacy_camera.screen_width = self.console.width
-        self.legacy_camera.screen_height = self.console.height
-        self.legacy_camera.config.crosshair_x = self.console.width // 2
-        self.legacy_camera.config.crosshair_y = self.console.height // 2
+                    if (0 <= screen_x < self.console.width and
+                        0 <= screen_y < self.console.height):
+                        self.console.print(screen_x, screen_y, tile.char,
+                                         fg=tile.fg_color, bg=tile.bg_color)
 
-        # Render world and crosshair
-        self.legacy_viewport.render_world(self.console, self.world_generator)
-        self.legacy_viewport.render_crosshair(self.console, self.world_generator)
+    def _render_regional_scale(self):
+        """Render regional scale view."""
+        # Ensure regional map is generated
+        self._update_context_for_scale_change()
 
-        # Restore original camera settings
-        self.legacy_camera.screen_width = original_width
-        self.legacy_camera.screen_height = original_height
-        self.legacy_camera.config.crosshair_x = original_crosshair_x
-        self.legacy_camera.config.crosshair_y = original_crosshair_y
+        if self.current_regional_map is None:
+            self.console.print(10, 10, "Generating regional map...", fg=(255, 255, 255))
+            return
 
-    def _render_ui_elements(self) -> None:
-        """Render UI elements appropriate for current scale."""
-        current_scale = self.multi_scale_camera.get_current_scale()
+        viewport = self.camera.get_viewport_info()
+        camera_x, camera_y = int(viewport.camera_x), int(viewport.camera_y)
 
+        # Calculate viewport bounds
+        start_x = max(0, camera_x - viewport.viewport_width // 2)
+        start_y = max(0, camera_y - viewport.viewport_height // 2)
+        end_x = min(len(self.current_regional_map[0]), start_x + viewport.viewport_width)
+        end_y = min(len(self.current_regional_map), start_y + viewport.viewport_height)
+
+        # Render regional tiles
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
+                if 0 <= y < len(self.current_regional_map) and 0 <= x < len(self.current_regional_map[0]):
+                    tile = self.current_regional_map[y][x]
+                    screen_x = viewport.viewport_start_x + (x - start_x)
+                    screen_y = viewport.viewport_start_y + (y - start_y)
+
+                    if (0 <= screen_x < self.console.width and
+                        0 <= screen_y < self.console.height):
+                        self.console.print(screen_x, screen_y, tile.char,
+                                         fg=tile.fg_color, bg=tile.bg_color)
+
+    def _render_local_scale(self):
+        """Render local scale view."""
+        # Ensure local map is generated
+        self._update_context_for_scale_change()
+
+        if self.current_local_map is None:
+            self.console.print(10, 10, "Generating local map...", fg=(255, 255, 255))
+            return
+
+        viewport = self.camera.get_viewport_info()
+        camera_x, camera_y = int(viewport.camera_x), int(viewport.camera_y)
+
+        # Calculate viewport bounds
+        start_x = max(0, camera_x - viewport.viewport_width // 2)
+        start_y = max(0, camera_y - viewport.viewport_height // 2)
+        end_x = min(len(self.current_local_map[0]), start_x + viewport.viewport_width)
+        end_y = min(len(self.current_local_map), start_y + viewport.viewport_height)
+
+        # Render local tiles (filter by Z-level)
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
+                if 0 <= y < len(self.current_local_map) and 0 <= x < len(self.current_local_map[0]):
+                    tile = self.current_local_map[y][x]
+
+                    # Filter by Z-level
+                    tile_z = 0  # Default to surface
+                    if hasattr(tile, 'z_level'):
+                        if tile.z_level.value == 'elevated':
+                            tile_z = 1
+                        elif tile.z_level.value == 'underground':
+                            tile_z = -1
+
+                    # Only render tiles at current Z-level
+                    if tile_z == self.current_z_level:
+                        screen_x = viewport.viewport_start_x + (x - start_x)
+                        screen_y = viewport.viewport_start_y + (y - start_y)
+
+                        if (0 <= screen_x < self.console.width and
+                            0 <= screen_y < self.console.height):
+                            self.console.print(screen_x, screen_y, tile.char,
+                                             fg=tile.fg_color, bg=tile.bg_color)
+
+    def _render_ui(self):
+        """Render UI elements."""
+        current_scale = self.camera.get_current_scale()
+        camera_x, camera_y = self.camera.get_camera_position()
+
+        # Top status bar
+        status_text = f"Scale: {current_scale.value.title()} | Pos: ({camera_x:.1f},{camera_y:.1f})"
         if current_scale == ViewScale.LOCAL:
-            # Full UI for detailed view
-            camera_x, camera_y = self.legacy_camera.get_position()
-            cursor_world_pos = (camera_x, camera_y)
-            self.status_bar.render(self.console, self.world_generator, cursor_world_pos)
-            self.instructions_panel.render(self.console)
-        else:
-            # Simplified UI for world/regional views
-            self._render_scale_navigation_ui()
+            z_level_name = {-1: "Underground", 0: "Surface", 1: "Elevated"}[self.current_z_level]
+            status_text += f" | Z-Level: {z_level_name}"
 
-    def _render_scale_navigation_ui(self) -> None:
-        """Render UI for world/regional scales."""
-        current_scale = self.multi_scale_camera.get_current_scale()
-        camera_x, camera_y = self.multi_scale_camera.get_camera_position()
-        world_x, world_y = self.multi_scale_camera.get_current_world_coordinates()
-
-        # Top status bar with scale info
-        status_text = f"Scale: {current_scale.value.title()} | Pos: {camera_x},{camera_y} | World: {world_x},{world_y}"
-        if len(status_text) < self.console.width - 4:
-            self.console.print(2, 2, status_text, fg=(255, 255, 255), bg=(60, 60, 60))
-
-        # Show world info if requested
-        if self.show_world_info:
-            self._render_world_info()
+        self.console.print(1, 1, status_text, fg=(255, 255, 255), bg=(40, 40, 40))
 
         # Bottom instructions
-        instructions = "1=World  2=Regional  3=Local  |  WASD=Move  Enter=Drill  I=Info  ESC=Quit"
-        if len(instructions) < self.console.width - 4:
-            self.console.print(2, self.console.height - 3, instructions, fg=(200, 200, 200), bg=(60, 60, 60))
+        if current_scale == ViewScale.LOCAL:
+            instructions = "Z=World  X=Regional  C=Local  |  WASD=Move  <>=Z-Level  ESC=Quit"
+        else:
+            instructions = "Z=World  X=Regional  C=Local  |  WASD=Move  ESC=Quit"
 
-    def _render_world_info(self) -> None:
-        """Render world generation information."""
-        world_info = self.world_scale_generator.get_world_info()
+        self.console.print(1, self.console.height - 2, instructions, fg=(200, 200, 200), bg=(40, 40, 40))
 
-        if world_info["status"] == "complete":
-            info_lines = [
-                f"World Seed: {world_info['seed']}",
-                f"Size: {world_info['world_size'][0]}×{world_info['world_size'][1]} sectors",
-                f"Avg Elevation: {world_info['average_elevation']:.1f}m",
-                f"Mountain Ranges: {world_info['major_mountain_ranges']}",
-                f"River Systems: {world_info['major_river_systems']}",
-                f"Generation Time: {world_info['generation_time']:.2f}s"
-            ]
-
-            # Render info box
-            start_y = 5
-            for i, line in enumerate(info_lines):
-                if start_y + i < self.console.height - 5:
-                    self.console.print(2, start_y + i, line, fg=(200, 200, 200), bg=(40, 40, 40))
+        # Transition indicator
+        if self.camera.is_transitioning():
+            progress = self.camera.get_transition_progress()
+            progress_text = f"Transitioning... {progress*100:.0f}%"
+            self.console.print(1, 3, progress_text, fg=(255, 255, 0))
 
     def _update_fps(self) -> None:
         """Update FPS counter for performance monitoring."""
