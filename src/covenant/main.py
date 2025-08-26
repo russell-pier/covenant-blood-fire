@@ -67,6 +67,11 @@ class Game:
         # Z-level for local map navigation
         self.current_z_level = 0  # 0 = surface, +1 = elevated, -1 = underground
 
+        # Cursor/crosshair settings
+        self.show_cursor = True
+        self.cursor_char = "+"
+        self.cursor_color = (255, 255, 0)  # Yellow
+
         # Performance monitoring
         self.frame_count = 0
         self.last_fps_time = time.time()
@@ -208,6 +213,11 @@ class Game:
             self.camera.move_camera(dx, dy)
             return
 
+        # Toggle cursor
+        if key == tcod.event.KeySym.TAB:
+            self.show_cursor = not self.show_cursor
+            return
+
         # Quit
         if key == tcod.event.KeySym.ESCAPE or key == tcod.event.KeySym.Q:
             raise SystemExit()
@@ -285,6 +295,9 @@ class Game:
                         self.console.print(screen_x, screen_y, tile.char,
                                          fg=tile.fg_color, bg=tile.bg_color)
 
+        # Render cursor/crosshair
+        self._render_cursor(viewport)
+
     def _render_regional_scale(self):
         """Render regional scale view."""
         # Ensure regional map is generated
@@ -315,6 +328,9 @@ class Game:
                         0 <= screen_y < self.console.height):
                         self.console.print(screen_x, screen_y, tile.char,
                                          fg=tile.fg_color, bg=tile.bg_color)
+
+        # Render cursor/crosshair
+        self._render_cursor(viewport)
 
     def _render_local_scale(self):
         """Render local scale view."""
@@ -358,24 +374,48 @@ class Game:
                             self.console.print(screen_x, screen_y, tile.char,
                                              fg=tile.fg_color, bg=tile.bg_color)
 
+        # Render cursor/crosshair
+        self._render_cursor(viewport)
+
+    def _render_cursor(self, viewport):
+        """Render cursor/crosshair at camera position."""
+        if not self.show_cursor:
+            return
+
+        # Calculate cursor position (center of viewport)
+        cursor_screen_x = viewport.viewport_start_x + viewport.viewport_width // 2
+        cursor_screen_y = viewport.viewport_start_y + viewport.viewport_height // 2
+
+        # Make sure cursor is within console bounds
+        if (0 <= cursor_screen_x < self.console.width and
+            0 <= cursor_screen_y < self.console.height):
+            self.console.print(cursor_screen_x, cursor_screen_y, self.cursor_char,
+                             fg=self.cursor_color)
+
     def _render_ui(self):
         """Render UI elements."""
         current_scale = self.camera.get_current_scale()
         camera_x, camera_y = self.camera.get_camera_position()
 
         # Top status bar
-        status_text = f"Scale: {current_scale.value.title()} | Pos: ({camera_x:.1f},{camera_y:.1f})"
+        status_text = f"Scale: {current_scale.value.title()} | Camera: ({camera_x:.1f},{camera_y:.1f})"
         if current_scale == ViewScale.LOCAL:
             z_level_name = {-1: "Underground", 0: "Surface", 1: "Elevated"}[self.current_z_level]
             status_text += f" | Z-Level: {z_level_name}"
+
+        # Add cursor status
+        if self.show_cursor:
+            status_text += f" | Cursor: ON"
+        else:
+            status_text += f" | Cursor: OFF"
 
         self.console.print(1, 1, status_text, fg=(255, 255, 255), bg=(40, 40, 40))
 
         # Bottom instructions
         if current_scale == ViewScale.LOCAL:
-            instructions = "Z=World  X=Regional  C=Local  |  WASD=Move  <>=Z-Level  ESC=Quit"
+            instructions = "Z=World  X=Regional  C=Local  |  WASD=Move  <>=Z-Level  TAB=Cursor  ESC=Quit"
         else:
-            instructions = "Z=World  X=Regional  C=Local  |  WASD=Move  ESC=Quit"
+            instructions = "Z=World  X=Regional  C=Local  |  WASD=Move  TAB=Cursor  ESC=Quit"
 
         self.console.print(1, self.console.height - 2, instructions, fg=(200, 200, 200), bg=(40, 40, 40))
 
