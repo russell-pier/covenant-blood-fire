@@ -66,7 +66,7 @@ cd empires
 uv sync
 
 # Run the game
-uv run python -m src.empires.main
+uv run python -m src.covenant.main
 ```
 
 #### Using pip
